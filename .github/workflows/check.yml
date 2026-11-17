@@ -1,0 +1,52 @@
+name: Check shader pack
+
+on:
+  push:
+    branches: [main]
+    paths: ["horizon-shaders.toml", "shaders/**", ".github/workflows/check.yml"]
+  pull_request:
+    paths: ["horizon-shaders.toml", "shaders/**", ".github/workflows/check.yml"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      CARGO_BUILD_JOBS: 2
+      CARGO_INCREMENTAL: 0
+      HORIZON_REV: 5cf677c51c7d1212330901f37305e928d0a0f883
+    steps:
+      - uses: actions/checkout@v4
+      - name: Get the tested Horizon revision
+        shell: bash
+        run: |
+          git init "$RUNNER_TEMP/horizon"
+          git -C "$RUNNER_TEMP/horizon" remote add origin https://github.com/horizon-rust/horizon.git
+          git -C "$RUNNER_TEMP/horizon" fetch --depth 1 origin "$HORIZON_REV"
+          git -C "$RUNNER_TEMP/horizon" checkout --detach FETCH_HEAD
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+      - name: Cache the validator build
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ${{ runner.temp }}/horizon/target
+          key: sunsun-validator-${{ runner.os }}-${{ env.HORIZON_REV }}
+      - name: Build the shader validator
+        shell: bash
+        run: |
+          cargo build --locked --profile fast \
+            --manifest-path "$RUNNER_TEMP/horizon/Cargo.toml" \
+            -p horizon-shader-api --bin horizon-shader
+      - name: Check source and installable archive
+        shell: bash
+        run: |
+          validator="$RUNNER_TEMP/horizon/target/fast/horizon-shader"
+          "$validator" check "$GITHUB_WORKSPACE"
+          "$validator" pack "$GITHUB_WORKSPACE" --out "$RUNNER_TEMP/sunsunshader.hshader"
+          "$validator" check "$RUNNER_TEMP/sunsunshader.hshader"
