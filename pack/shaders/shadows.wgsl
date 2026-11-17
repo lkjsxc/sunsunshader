@@ -25,19 +25,19 @@ fn ss_shadow_disk(index: u32, count: u32) -> vec2<f32> {
     return vec2<f32>(cos(angle), sin(angle)) * radius;
 }
 
-fn ss_shadow_visibility(position: vec3<f32>) -> f32 {
-    let cloud = ss_cloud_transmittance(position);
-    if !shadows || frame.has_shadow == 0u {
-        return cloud;
-    }
+// Terrain-only visibility lets a shaft ray share its slow cloud attenuation.
+fn ss_terrain_visibility(position: vec3<f32>) -> f32 {
+    if !shadows || frame.has_shadow == 0u { return 1.0; }
     let bias = max(frame.shadow_center_texel * 0.24, 0.012);
     let p = shadow_position(position + frame.light_direction * bias);
     let edge = ss_shadow_edge(p);
-    if edge <= 0.0 {
-        return cloud;
-    }
+    if edge <= 0.0 { return 1.0; }
     let lit = textureSampleCompareLevel(shadow_map, shadow_sampler, p.xy, p.z);
-    return mix(1.0, lit, edge) * cloud;
+    return mix(1.0, lit, edge);
+}
+
+fn ss_shadow_visibility(position: vec3<f32>) -> f32 {
+    return ss_terrain_visibility(position) * ss_cloud_transmittance(position);
 }
 
 fn ss_shadow(position: vec3<f32>, normal: vec3<f32>) -> vec3<f32> {
@@ -106,6 +106,9 @@ fn ss_shadow(position: vec3<f32>, normal: vec3<f32>) -> vec3<f32> {
         let path = clamp((p.z - water_depth) / ss_shadow_depth_scale(), 0.0, 32.0);
         transmission = exp(-vec3<f32>(0.18, 0.055, 0.022) * path);
     }
-    let filtered = opaque_visibility * mix(transmission, vec3<f32>(1.0), clear_visibility);
+    // Combined-map visibility is absolute, not conditional on the opaque map.
+    // Entities can be appended only to the opaque map by this Nightly.
+    let clear = min(opaque_visibility, clear_visibility);
+    let filtered = vec3<f32>(clear) + transmission * (opaque_visibility - clear);
     return mix(vec3<f32>(1.0), filtered, edge) * cloud;
 }

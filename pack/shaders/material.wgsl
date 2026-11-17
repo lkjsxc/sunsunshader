@@ -48,6 +48,13 @@ fn material(source: MaterialInput) -> Surface {
         let mineral = max(max(albedo.r, albedo.g), albedo.b) - min(min(albedo.r, albedo.g), albedo.b);
         color += albedo * smoothstep(0.12, 0.42, mineral) * 0.12;
     }
+    if input.emission > 0.001 {
+        // Keep source texture variation before the Nightly's bounded target.
+        // A continuous shoulder avoids the flat hue-normalized lava plateau.
+        let peak = max(color.r, max(color.g, color.b));
+        let source_peak = 1.0 - exp(-max(peak, 0.0) * 1.10);
+        color *= mix(1.0, source_peak / max(peak, 0.00001), clamp(input.emission, 0.0, 1.0));
+    }
     if !input.translucent {
         set_surface(normal, wet * 0.65, input.emission);
     }

@@ -45,11 +45,12 @@ fn ss_air_shafts(position: vec3<f32>, pixel: vec2<f32>) -> vec3<f32> {
     if quality >= 3u { count = 16u; }
     let jitter = ss_hash3(vec3<i32>(vec2<i32>(pixel), 27));
     var light = 0.0;
+    let cloud_visibility = ss_cloud_transmittance(ray * distance * 0.5);
     for (var i = 0u; i < count; i += 1u) {
         let along = (f32(i) + 0.15 + jitter * 0.70) * distance / f32(count);
-        light += ss_shadow_visibility(ray * along) * exp(-along * 0.004);
+        light += ss_terrain_visibility(ray * along) * exp(-along * 0.004);
     }
-    light /= f32(count);
+    light *= cloud_visibility / f32(count);
     // Single scattering uses the Henyey-Greenstein phase named in atmosphere.wgsl.
     let phase = min(ss_phase_aerosol(dot(ray, frame.sun_direction), 0.62) * 12.56637, 5.0);
     let density = (0.0018 + 0.006 * frame.rain) * haze;
@@ -76,7 +77,7 @@ fn post(source: PostInput) -> vec4<f32> {
     // strength survives in our metadata, allowing a restrained source-only
     // bloom boost; ordinary surfaces and native entities are not guessed.
     let emitter = select(0.0, clamp(metadata.data, 0.0, 1.0), metadata.present);
-    let surface = input.color.rgb * ss_contact_occlusion(input, position) * (1.0 + emitter * 2.8);
+    let surface = input.color.rgb * ss_contact_occlusion(input, position) * (1.0 + emitter * 1.35);
     let air = ss_fog(surface, position) + ss_air_shafts(position, input.pixel);
     let result = ss_cloud_composite(air, normalize(position), length(position));
     return vec4<f32>(result, 1.0);

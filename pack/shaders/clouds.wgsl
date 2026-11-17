@@ -144,7 +144,11 @@ fn ss_cumulus_density(lobe: SSCumulusLobe, point: vec3<f32>, footprint: f32) -> 
     let local = (point - lobe.centre) / lobe.radius;
     let support = 1.0 - dot(local, local);
     if support <= 0.0 { return 0.0; }
-    let broad = ss_noise3(point * 0.045 + vec3<f32>(17.1, 3.7, 41.3));
+    let broad_weight = 1.0 - smoothstep(8.0, 30.0, footprint);
+    var broad = 0.5;
+    if broad_weight > 0.001 {
+        broad = mix(0.5, ss_noise3(point * 0.045 + vec3<f32>(17.1, 3.7, 41.3)), broad_weight);
+    }
     let fine_weight = 1.0 - smoothstep(4.0, 13.0, footprint);
     var fine = 0.5;
     if fine_weight > 0.001 {
@@ -160,7 +164,7 @@ fn ss_cumulus_density(lobe: SSCumulusLobe, point: vec3<f32>, footprint: f32) -> 
 }
 
 fn ss_cumulus_eroded_chord(lobe: SSCumulusLobe, origin: vec3<f32>, ray: vec3<f32>,
-    start: f32, finish: f32, distant_filter: bool, sample_cap: u32) -> vec3<f32> {
+    start: f32, finish: f32, distant_filter: bool, sample_cap: u32, angular_cone: f32) -> vec3<f32> {
     let chord = ss_cumulus_chord(lobe, origin, ray, start, finish);
     if chord.z <= 0.0001 { return chord; }
     var samples = 3u;
@@ -168,7 +172,7 @@ fn ss_cumulus_eroded_chord(lobe: SSCumulusLobe, origin: vec3<f32>, ray: vec3<f32
     if quality >= 2u { samples = 5u; }
     samples = min(samples, sample_cap);
     let length = chord.y - chord.x;
-    let footprint = select(0.5, max(chord.x, 0.0) * 0.0018, distant_filter);
+    let footprint = select(0.5, max(chord.x, 0.0) * angular_cone, distant_filter);
     var mass = 0.0;
     for (var i = 0u; i < 5u; i += 1u) {
         if i >= samples { break; }
@@ -208,7 +212,7 @@ fn ss_cumulus_shade(position: vec3<f32>) -> f32 {
             for (var i = 0u; i < 5u; i += 1u) {
                 if i >= ss_cumulus_count(seed) { break; }
                 mass += ss_cumulus_eroded_chord(ss_cumulus_lobe(cell, seed, i),
-                    origin, light, start, finish, false, 2u).z;
+                    origin, light, start, finish, false, 2u, 0.0).z;
             }
         }
         if crossing.x < crossing.y {
@@ -225,7 +229,7 @@ fn ss_cumulus_shade(position: vec3<f32>) -> f32 {
 }
 
 fn ss_cumulus_transport(ray: vec3<f32>, behind: vec3<f32>, origin_world: vec3<f32>,
-    max_distance: f32, reflected: bool) -> vec3<f32> {
+    max_distance: f32, reflected: bool, angular_cone: f32) -> vec3<f32> {
     let origin = ss_cumulus_origin(origin_world);
     var count = 14u;
     var range = 2900.0;
@@ -275,7 +279,7 @@ fn ss_cumulus_transport(ray: vec3<f32>, behind: vec3<f32>, origin_world: vec3<f3
             for (var i = 0u; i < 5u; i += 1u) {
                 if i >= ss_cumulus_count(seed) { break; }
                 let chord = ss_cumulus_eroded_chord(ss_cumulus_lobe(cell, seed, i),
-                    origin, ray, start, finish, true, sample_cap);
+                    origin, ray, start, finish, true, sample_cap, angular_cone);
                 mass += chord.z;
                 weighted_front += mix(chord.x, chord.y, 0.31) * chord.z;
             }
@@ -318,20 +322,23 @@ fn ss_cumulus_transport(ray: vec3<f32>, behind: vec3<f32>, origin_world: vec3<f3
 
 fn ss_cumulus_volume(ray: vec3<f32>, behind: vec3<f32>, origin_world: vec3<f32>,
     max_distance: f32) -> vec3<f32> {
-    return ss_cumulus_transport(ray, behind, origin_world, max_distance, false);
+    let pixel_angle = 2.0 / max(frame.resolution.y * abs(frame.projection[1].y), 1.0);
+    return ss_cumulus_transport(ray, behind, origin_world, max_distance, false, pixel_angle);
 }
 
 // Water uses the same geometry, erosion and lighting with a shorter traversal
 // and fewer within-lobe samples. The range fades continuously, avoiding a hard
 // reflected-cloud edge. This does not create an unrelated reflection sky.
-fn ss_cloud_reflection(background: vec3<f32>, direction: vec3<f32>, origin_world: vec3<f32>) -> vec3<f32> {
+fn ss_cloud_reflection(background: vec3<f32>, direction: vec3<f32>, origin_world: vec3<f32>, angular_cone: f32) -> vec3<f32> {
     if !clouds || frame.dimension != 0 { return background; }
     let ray = normalize(direction);
-    let high_layer = ss_cirrus(ray, background, origin_world, 11000.0);
+    let pixel_angle = 2.0 / max(frame.resolution.y * abs(frame.projection[1].y), 1.0);
+    let cone = max(angular_cone, pixel_angle);
+    let high_layer = ss_cirrus_filtered(ray, background, origin_world, 11000.0, cone);
     let storm = smoothstep(0.02, 0.65, frame.rain);
-    if storm <= 0.0 { return ss_cumulus_transport(ray, high_layer, origin_world, 100000.0, true); }
+    if storm <= 0.0 { return ss_cumulus_transport(ray, high_layer, origin_world, 100000.0, true, cone); }
     if storm >= 1.0 { return ss_stratus_volume(ray, high_layer, origin_world, 3500.0); }
-    return mix(ss_cumulus_transport(ray, high_layer, origin_world, 100000.0, true),
+    return mix(ss_cumulus_transport(ray, high_layer, origin_world, 100000.0, true, cone),
         ss_stratus_volume(ray, high_layer, origin_world, 3500.0), storm);
 }
 
@@ -418,25 +425,54 @@ fn ss_stratus_transmittance(position: vec3<f32>) -> f32 {
 
 // A separate, higher layer of sheared, broken filaments. Its mask and fibre
 // phase are warped at different scales, rather than repeating parallel bands.
-fn ss_cirrus(ray: vec3<f32>, behind: vec3<f32>, origin_world: vec3<f32>, max_distance: f32) -> vec3<f32> {
+fn ss_cirrus_filtered(ray: vec3<f32>, behind: vec3<f32>, origin_world: vec3<f32>,
+    max_distance: f32, angular_cone: f32) -> vec3<f32> {
     if abs(ray.y) <= 0.018 { return behind; }
     let distance = (510.0 - origin_world.y) / ray.y;
     if distance <= 0.0 || distance >= max_distance { return behind; }
+    // Project an angular pixel/cone onto the high cloud plane. Without the
+    // grazing-angle denominator, narrow fibres become horizontal one-pixel
+    // stripes in the sky and bright contour loops in moving water.
+    let footprint = distance * angular_cone / max(abs(ray.y), 0.018);
+    let warp_weight = 1.0 - smoothstep(0.18, 0.65, footprint * 0.00292);
+    let broad_weight = 1.0 - smoothstep(0.18, 0.65, footprint * 0.0038);
+    let primary_weight = 1.0 - smoothstep(0.18, 0.65, footprint * 0.0095);
+    let fine_weight = 1.0 - smoothstep(0.18, 0.55, footprint * 0.014);
     let point = origin_world + ray * distance;
     let wind = ss_periodic_drift(vec2<f32>(0.00012, -0.00024));
     let coordinate = vec3<f32>(point.x * 0.00065 + point.z * 0.0011 + wind.x,
         point.z * 0.0038 - point.x * 0.0008 + wind.y, 4.3);
-    let warp = ss_noise3(coordinate * 0.75 + vec3<f32>(7.4, 18.2, 9.1));
-    let broad = ss_noise3(vec3<f32>(coordinate.xy * 0.64, 17.9));
-    let fibres = ss_noise3(coordinate + vec3<f32>(warp * 1.4, warp * 0.8, 0.0)) * 0.66
-        + ss_noise3(coordinate * vec3<f32>(1.8, 3.1, 1.0) + vec3<f32>(11.0)) * 0.34;
-    let amount = smoothstep(0.38, 0.68, broad) * smoothstep(0.46, 0.75, fibres) * 0.34
+    var warp = 0.5;
+    if warp_weight > 0.001 && primary_weight > 0.001 {
+        warp = mix(0.5, ss_noise3(coordinate * 0.75 + vec3<f32>(7.4, 18.2, 9.1)), warp_weight);
+    }
+    var broad = 0.5;
+    if broad_weight > 0.001 {
+        broad = mix(0.5, ss_noise3(vec3<f32>(point.x * 0.0024 + wind.x, 17.9, point.z * 0.0024 + wind.y)), broad_weight);
+    }
+    var primary = 0.5;
+    if primary_weight > 0.001 {
+        primary = mix(0.5, ss_noise3(coordinate + vec3<f32>(warp * 1.4, warp * 0.8, 0.0)), primary_weight);
+    }
+    var fine = 0.5;
+    if fine_weight > 0.001 {
+        fine = mix(0.5, ss_noise3(coordinate * vec3<f32>(1.8, 3.1, 1.0) + vec3<f32>(11.0)), fine_weight);
+    }
+    let fibres = primary * 0.66 + fine * 0.34;
+    // An isotropic patch mask interrupts the sheared fibres, so low-sun
+    // perspective cannot turn the entire high layer into long contrails.
+    let amount = smoothstep(0.46, 0.72, broad) * smoothstep(0.46, 0.75, fibres) * 0.20
         * (1.0 - smoothstep(4500.0, 11000.0, distance)) * (1.0 - frame.rain * 0.85);
     let twilight_light = smoothstep(-0.23, 0.05, frame.sun_direction.y);
     let forward = pow(max(dot(ray, frame.sun_direction), 0.0), 8.0);
-    let colour = ss_sun_color() * twilight_light * (0.70 + forward * 0.6)
+    let colour = ss_sun_color() * twilight_light * (0.60 + forward * 0.25)
         + vec3<f32>(0.015, 0.028, 0.054) * ss_moonlight();
     return mix(behind, colour, amount);
+}
+
+fn ss_cirrus(ray: vec3<f32>, behind: vec3<f32>, origin_world: vec3<f32>, max_distance: f32) -> vec3<f32> {
+    let pixel_angle = 2.0 / max(frame.resolution.y * abs(frame.projection[1].y), 1.0);
+    return ss_cirrus_filtered(ray, behind, origin_world, max_distance, pixel_angle);
 }
 
 fn ss_stratus_volume(ray: vec3<f32>, behind: vec3<f32>, origin_world: vec3<f32>, max_distance: f32) -> vec3<f32> {

@@ -88,6 +88,26 @@ fn ss_water_wave_normal(input: MaterialInput) -> vec3<f32> {
     return upward * select(-1.0, 1.0, input.normal.y >= 0.0);
 }
 
+// The reflected cloud image follows the resolved swell. Finer capillary slopes
+// only break the direct sun response into small highlights; their energy folds
+// into roughness once a pixel can no longer resolve them.
+fn ss_water_specular_normal(input: MaterialInput, normal: vec3<f32>) -> vec3<f32> {
+    if input.face != 1u || water_waves <= 0.0 {
+        return normal;
+    }
+    let p = (input.position + frame.camera_position).xz;
+    let a = vec2<f32>(5.61, 2.27);
+    let b = vec2<f32>(-3.49, 7.83);
+    let footprint = ss_water_footprint(input);
+    let filtered = vec2<f32>(1.0) - smoothstep(vec2<f32>(0.45),
+        vec2<f32>(1.50), footprint * vec2<f32>(6.052, 8.572));
+    let slope = a * cos(dot(p, a) + ss_water_phase(1319.0)) * 0.0041 * filtered.x
+        + b * cos(dot(p, b) - ss_water_phase(1777.0)) * 0.0026 * filtered.y;
+    let strength = water_waves / (1.0 + length(input.position) * 0.0015);
+    let side = select(-1.0, 1.0, normal.y >= 0.0);
+    return normalize(normal + vec3<f32>(-slope.x, 0.0, -slope.y) * strength * side);
+}
+
 fn ss_water_pixel(uv: vec2<f32>) -> vec2<i32> {
     let size = vec2<i32>(textureDimensions(opaque_depth));
     return clamp(vec2<i32>(uv * vec2<f32>(size)), vec2<i32>(0), size - vec2<i32>(1));
@@ -122,7 +142,8 @@ fn ss_water_color(uv: vec2<f32>) -> vec3<f32> {
     return mix(mix(a, b, weight.x), mix(c, d, weight.x), weight.y);
 }
 
-fn ss_water_ssr(origin: vec3<f32>, direction: vec3<f32>) -> SsWaterReflection {
+fn ss_water_ssr(origin: vec3<f32>, direction: vec3<f32>,
+    surface_y: f32) -> SsWaterReflection {
     var result = SsWaterReflection(vec3<f32>(0.0), 0.0);
     let steps = select(12u, 24u, quality >= 2u);
     let reach = select(64.0, 96.0, quality >= 2u);
@@ -146,6 +167,7 @@ fn ss_water_ssr(origin: vec3<f32>, direction: vec3<f32>) -> SsWaterReflection {
                 var far_t = t;
                 var hit_uv = uv;
                 var hit_gap = delta;
+                var hit_depth = depth;
                 for (var j = 0u; j < 4u; j += 1u) {
                     let middle = (near_t + far_t) * 0.5;
                     let q = frame.view * vec4<f32>(origin + direction * middle, 1.0);
@@ -158,6 +180,7 @@ fn ss_water_ssr(origin: vec3<f32>, direction: vec3<f32>) -> SsWaterReflection {
                         far_t = middle;
                         hit_uv = quv;
                         hit_gap = gap;
+                        hit_depth = qdepth;
                     } else {
                         near_t = middle;
                     }
@@ -170,9 +193,14 @@ fn ss_water_ssr(origin: vec3<f32>, direction: vec3<f32>) -> SsWaterReflection {
                     thickness_limit, hit_gap);
                 let edge = min(min(hit_uv.x, 1.0 - hit_uv.x),
                     min(hit_uv.y, 1.0 - hit_uv.y));
+                // Opaque depth includes the submerged bed, but contains no
+                // water. A downward wave ray must not mistake that bed for
+                // above-water reflected shore. The transition is in blocks.
+                let hit_position = ss_water_position(hit_uv, hit_depth);
+                let above_water = smoothstep(-0.04, 0.18, hit_position.y - surface_y);
                 let fade = smoothstep(0.015, 0.11, edge)
-                    * (1.0 - smoothstep(reach * 0.68, reach, far_t));
-                if agreement > 0.001 {
+                    * (1.0 - smoothstep(reach * 0.68, reach, far_t)) * above_water;
+                if agreement * fade > 0.001 {
                     result.color = ss_water_color(hit_uv);
                     result.confidence = agreement * fade;
                     return result;
@@ -196,7 +224,7 @@ fn ss_water_reflection(input: MaterialInput, normal: vec3<f32>) -> vec3<f32> {
     var sky = ss_dimension_sky(direction);
     var screen_hit = SsWaterReflection(vec3<f32>(0.0), 0.0);
     if water_reflections && quality > 0u {
-        screen_hit = ss_water_ssr(input.position + normal * 0.055, direction);
+        screen_hit = ss_water_ssr(input.position + normal * 0.055, direction, input.position.y);
         if screen_hit.confidence >= 0.999 {
             return screen_hit.color;
         }
@@ -204,8 +232,11 @@ fn ss_water_reflection(input: MaterialInput, normal: vec3<f32>) -> vec3<f32> {
     // Reflections use the same world-space clouds at Medium too. Their
     // filtered path has a smaller transport budget, not a different sky.
     if quality >= 1u && frame.eye_in != 1u {
+        let pixel_angle = 2.0 / max(frame.resolution.y * abs(frame.projection[1].y), 1.0);
+        let angular_cone = clamp(pixel_angle + ss_water_footprint(input) * 0.10,
+            pixel_angle, 0.06);
         sky = ss_cloud_reflection(sky, direction,
-            input.position + frame.camera_position);
+            input.position + frame.camera_position, angular_cone);
     }
     sky *= open_sky;
     if frame.eye_in == 1u && direction.y < 0.0 {
@@ -298,19 +329,26 @@ fn sunsun_water(input: MaterialInput) -> Surface {
     let reflected = ss_water_reflection(input, normal);
     // Preserve the energy of filtered-out ripples in a wider stable lobe.
     let footprint = ss_water_footprint(input);
-    let unresolved = smoothstep(0.20, 1.8, footprint);
+    let unresolved = smoothstep(0.08, 1.8, footprint);
     let roughness = 0.060 + frame.rain * 0.028 + unresolved * 0.045;
     let shadow = ss_shadow(input.position, input.normal);
     let direct_open = select(sky_reach, 1.0, shadows && frame.has_shadow != 0u);
-    let sun_glint = ss_water_glitter(normal, view, frame.sun_direction, roughness);
+    let specular_normal = ss_water_specular_normal(input, normal);
+    let sun_glint = ss_water_glitter(specular_normal, view, frame.sun_direction, roughness);
     let sun_skirt = ss_water_glitter(normal, view, frame.sun_direction,
         roughness * 1.8 + 0.035);
-    let solar = (sun_glint * 1.35 + sun_skirt * 0.42)
+    let solar = (sun_glint * 0.82 + sun_skirt * 0.34)
         * ss_sun_color() * ss_daylight() * (1.0 - frame.rain * 0.85);
-    let lunar = ss_water_glitter(normal, view, frame.moon_direction, roughness + 0.025)
+    let lunar = ss_water_glitter(specular_normal, view, frame.moon_direction, roughness + 0.025)
         * vec3<f32>(0.24, 0.37, 0.62) * ss_moonlight() * 0.36;
     let reflection_amount = select(fresnel * shore, fresnel, frame.eye_in == 1u);
-    let color = mix(transmission, reflected, reflection_amount)
-        + min(solar + lunar, vec3<f32>(4.0)) * shadow * direct_open * shore;
+    let base = mix(transmission, reflected, reflection_amount);
+    let direct = (solar + lunar) * shadow * direct_open * shore;
+    // Ordinary Nightly stores the world in a bounded colour target. Compress
+    // direct sparkle continuously into its remaining headroom before encoding,
+    // so a large GGX peak keeps gradation instead of becoming a solid oval.
+    let headroom = max(1.0 - max(base.x, max(base.y, base.z)), 0.0);
+    let direct_peak = max(direct.x, max(direct.y, direct.z));
+    let color = base + direct * (headroom / max(headroom + direct_peak, 0.000001));
     return Surface(vec4<f32>(ss_encode(max(color, vec3<f32>(0.0))), 1.0));
 }
