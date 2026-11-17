@@ -6,7 +6,7 @@ api = "0.2"
 description = "Warm light, cool shade and weathered air."
 authors = ["lkjsxc"]
 license = "Apache-2.0"
-shared = ["shaders/options.wgsl", "shaders/atmosphere.wgsl", "shaders/lighting.wgsl", "shaders/fog.wgsl"]
+shared = ["shaders/options.wgsl", "shaders/atmosphere.wgsl", "shaders/clouds.wgsl", "shaders/lighting.wgsl", "shaders/fog.wgsl"]
 
 [frame]
 blend = "linear"
@@ -16,7 +16,7 @@ fog = "pack"
 file = "shaders/sky.wgsl"
 sun = false
 stars = false
-clouds = true
+clouds = false
 
 [material]
 file = "shaders/material.wgsl"
@@ -28,6 +28,7 @@ files = ["shaders/shadows.wgsl"]
 
 [[post]]
 file = "shaders/air.wgsl"
+files = ["shaders/shadows.wgsl"]
 name = "Air"
 
 [tonemap]
@@ -115,6 +116,20 @@ default = true
 id = "water_reflections"
 name = "Terrain reflections"
 description = "Reflect terrain in water using the screen or available ray queries."
+type = "bool"
+default = true
+
+[[options]]
+id = "clouds"
+name = "Clouds"
+description = "Draw low cloud volumes, thin high clouds and their shade."
+type = "bool"
+default = true
+
+[[options]]
+id = "weather_detail"
+name = "Weather detail"
+description = "Add wet surfaces, a cold snow coat, clearing-rain bows and faint auroras."
 type = "bool"
 default = true
 

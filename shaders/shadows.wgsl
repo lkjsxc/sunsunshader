@@ -26,22 +26,24 @@ fn ss_shadow_disk(index: u32, count: u32) -> vec2<f32> {
 }
 
 fn ss_shadow_visibility(position: vec3<f32>) -> f32 {
+    let cloud = ss_cloud_transmittance(position);
     if !shadows || frame.has_shadow == 0u {
-        return 1.0;
+        return cloud;
     }
     let bias = max(frame.shadow_center_texel * 0.24, 0.012);
     let p = shadow_position(position + frame.light_direction * bias);
     let edge = ss_shadow_edge(p);
     if edge <= 0.0 {
-        return 1.0;
+        return cloud;
     }
     let lit = textureSampleCompareLevel(shadow_map, shadow_sampler, p.xy, p.z);
-    return mix(1.0, lit, edge);
+    return mix(1.0, lit, edge) * cloud;
 }
 
 fn ss_shadow(position: vec3<f32>, normal: vec3<f32>) -> vec3<f32> {
+    let cloud = ss_cloud_transmittance(position);
     if !shadows || frame.has_shadow == 0u {
-        return vec3<f32>(1.0);
+        return vec3<f32>(cloud);
     }
 
     let facing = clamp(dot(normal, frame.light_direction), 0.0, 1.0);
@@ -50,7 +52,7 @@ fn ss_shadow(position: vec3<f32>, normal: vec3<f32>) -> vec3<f32> {
     let p = shadow_position(shifted);
     let edge = ss_shadow_edge(p);
     if edge <= 0.0 {
-        return vec3<f32>(1.0);
+        return vec3<f32>(cloud);
     }
 
     let side = max(frame.shadow_resolution, 1.0);
@@ -105,5 +107,5 @@ fn ss_shadow(position: vec3<f32>, normal: vec3<f32>) -> vec3<f32> {
         transmission = exp(-vec3<f32>(0.18, 0.055, 0.022) * path);
     }
     let filtered = opaque_visibility * mix(transmission, vec3<f32>(1.0), clear_visibility);
-    return mix(vec3<f32>(1.0), filtered, edge);
+    return mix(vec3<f32>(1.0), filtered, edge) * cloud;
 }

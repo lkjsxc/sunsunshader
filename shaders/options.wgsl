@@ -8,3 +8,6 @@ override shadows: bool = true;
 override water_reflections: bool = true;
 // Fixed normal-wave amplitude; the profiles control reflection work.
 override water_waves: f32 = 1.0;
+
+override clouds: bool = true;
+override weather_detail: bool = true;

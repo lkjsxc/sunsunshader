@@ -26,10 +26,19 @@ fn ss_water_wave_normal(input: MaterialInput) -> vec3<f32> {
     let b = dot(p, vec2<f32>(-0.29, 1.13)) - t * 1.02;
     let c = dot(p, vec2<f32>(1.91, -0.83)) + t * 1.42;
     let d = dot(p, vec2<f32>(-2.13, -1.57)) - t * 1.73;
-    var slope = vec2<f32>(0.71, 0.32) * cos(a) * 0.044
-              + vec2<f32>(-0.29, 1.13) * cos(b) * 0.027
-              + vec2<f32>(1.91, -0.83) * cos(c) * 0.012
-              + vec2<f32>(-2.13, -1.57) * cos(d) * 0.006;
+    // A grazing pixel covers much more water than a downward-facing pixel.
+    // Remove each wave before it becomes smaller than a pixel, avoiding
+    // coherent ripple bands at the horizon without blurring the near shore.
+    let eye_distance = max(length(input.position), 0.001);
+    let facing = max(abs(dot(-input.position / eye_distance, input.normal)), 0.025);
+    let footprint = 2.0 * eye_distance
+        / max(frame.resolution.y * abs(frame.projection[1].y) * facing, 1.0);
+    let wave_filter = vec4<f32>(1.0) - smoothstep(vec4<f32>(0.8), vec4<f32>(2.8),
+        footprint * vec4<f32>(0.779, 1.167, 2.082, 2.646));
+    var slope = vec2<f32>(0.71, 0.32) * cos(a) * 0.044 * wave_filter.x
+              + vec2<f32>(-0.29, 1.13) * cos(b) * 0.027 * wave_filter.y
+              + vec2<f32>(1.91, -0.83) * cos(c) * 0.012 * wave_filter.z
+              + vec2<f32>(-2.13, -1.57) * cos(d) * 0.006 * wave_filter.w;
 
     if frame.rain > 0.01 && frame.precipitation == 1u {
         let grid = p * 0.8;
@@ -41,7 +50,8 @@ fn ss_water_wave_normal(input: MaterialInput) -> vec3<f32> {
         let age = fract(t * 0.79 + h);
         let ring = r - age * 0.40;
         let envelope = exp(-ring * ring * 240.0) * (1.0 - age) * (1.0 - smoothstep(0.30, 0.48, r));
-        slope += delta / max(r, 0.025) * cos(ring * 58.0) * envelope * frame.rain * 0.028;
+        let ripple_filter = 1.0 - smoothstep(0.8, 2.8, footprint * 46.4);
+        slope += delta / max(r, 0.025) * cos(ring * 58.0) * envelope * frame.rain * 0.028 * ripple_filter;
     }
 
     // Subpixel waves flatten gradually so the far shore remains steady.
@@ -130,32 +140,42 @@ fn ss_water_ssr(origin: vec3<f32>, direction: vec3<f32>) -> SsWaterReflection {
 fn ss_water_reflection(input: MaterialInput, normal: vec3<f32>) -> vec3<f32> {
     let incident = normalize(input.position);
     let direction = reflect(incident, normal);
+    let open_sky = mix(0.045, 1.0, smoothstep(0.04, 0.70, input.light.y));
     var sky = ss_dimension_sky(direction);
-    // Nearby walls block the open sky in a cavern.
-    sky *= mix(0.045, 1.0, smoothstep(0.04, 0.70, input.light.y));
-    if frame.eye_in == 1u && direction.y < 0.0 {
-        sky = vec3<f32>(0.005, 0.035, 0.060) * (0.12 + 0.88 * ss_daylight());
-    }
-    if !water_reflections || quality == 0u {
-        return sky;
-    }
+    var screen_hit = SsWaterReflection(vec3<f32>(0.0), 0.0);
 
-    let origin = input.position + normal * 0.035;
-    if quality >= 2u && frame.has_ray_tracing == 1u {
-        let hit = trace(origin, direction, min(frame.ray_distance, 96.0));
-        if hit.distance >= 0.0 {
-            let tint = hit.tint.rgb / max(ss_face_shade(hit.normal), 0.12);
-            let albedo = hit.albedo.rgb * min(tint, vec3<f32>(1.35));
-            let foliage = select(0.0, 1.0, (hit.tags & 1u) != 0u);
-            let sources = block_light_color(hit.position);
-            let illumination = ss_surface_light(hit.normal, -direction, hit.light,
-                ss_shadow(hit.position, hit.normal), sources, vec3<f32>(0.0), foliage);
-            let reflected = albedo * illumination + ss_surface_emission(albedo, hit.emission);
-            return mix(reflected, sky, 1.0 - exp(-hit.distance * 0.0018));
+    if water_reflections && quality > 0u {
+        let origin = input.position + normal * 0.035;
+        if quality >= 2u && frame.has_ray_tracing == 1u {
+            let hit = trace(origin, direction, min(frame.ray_distance, 96.0));
+            if hit.distance >= 0.0 {
+                let tint = hit.tint.rgb / max(ss_face_shade(hit.normal), 0.12);
+                let albedo = hit.albedo.rgb * min(tint, vec3<f32>(1.35));
+                let foliage = select(0.0, 1.0, (hit.tags & 1u) != 0u);
+                let sources = block_light_color(hit.position);
+                let illumination = ss_surface_light(hit.normal, -direction, hit.light,
+                    ss_shadow(hit.position, hit.normal), sources, vec3<f32>(0.0), foliage);
+                let reflected = albedo * illumination + ss_surface_emission(albedo, hit.emission);
+                return mix(reflected, sky * open_sky, 1.0 - exp(-hit.distance * 0.0018));
+            }
+        }
+        screen_hit = ss_water_ssr(origin, direction);
+        if screen_hit.confidence >= 0.999 {
+            return screen_hit.color;
         }
     }
 
-    let screen_hit = ss_water_ssr(origin, direction);
+    // Only unoccluded High/Ultra reflections pay for a second cloud march.
+    // Its origin is this water surface, so the cloud pattern has correct parallax.
+    if quality >= 2u && frame.eye_in != 1u {
+        sky = ss_cloud_composite_from(sky, direction,
+            input.position + frame.camera_position, 10000.0);
+    }
+    // Nearby walls block the open sky in a cavern.
+    sky *= open_sky;
+    if frame.eye_in == 1u && direction.y < 0.0 {
+        sky = vec3<f32>(0.005, 0.035, 0.060) * (0.12 + 0.88 * ss_daylight());
+    }
     return mix(sky, screen_hit.color, screen_hit.confidence);
 }
 
