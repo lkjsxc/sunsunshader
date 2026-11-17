@@ -31,6 +31,39 @@ file = "shaders/air.wgsl"
 files = ["shaders/shadows.wgsl"]
 name = "Air"
 
+[[post]]
+file = "shaders/bloom_seed.wgsl"
+name = "Bloom seed"
+output = "ss_bright"
+scale = 0.25
+
+[[post]]
+file = "shaders/bloom_horizontal.wgsl"
+name = "Bloom horizontal"
+output = "ss_blur"
+scale = 0.25
+
+[[post]]
+file = "shaders/bloom_vertical.wgsl"
+name = "Bloom vertical"
+output = "ss_bloom"
+scale = 0.25
+
+[[post]]
+file = "shaders/compose.wgsl"
+name = "Bloom and camera motion"
+
+[[post]]
+file = "shaders/focus.wgsl"
+name = "Optional focus"
+
+[[post]]
+file = "shaders/lens.wgsl"
+name = "Edge resolve"
+
+[weather]
+file = "shaders/weather.wgsl"
+
 [tonemap]
 file = "shaders/tonemap.wgsl"
 
@@ -132,6 +165,48 @@ name = "Weather detail"
 description = "Add wet surfaces, a cold snow coat, clearing-rain bows and faint auroras."
 type = "bool"
 default = true
+
+[[options]]
+id = "bloom"
+name = "Bloom"
+description = "Set the strength of the soft glow around bright light."
+type = "float"
+default = 0.10
+min = 0.0
+max = 0.30
+step = 0.02
+
+[[options]]
+id = "depth_of_field"
+name = "Depth of field"
+description = "Focus at the centre of the screen; off by default."
+type = "bool"
+default = false
+
+[[options]]
+id = "camera_motion_blur"
+name = "Camera motion blur"
+description = "Blur camera movement; object motion is not available."
+type = "bool"
+default = false
+
+[[options]]
+id = "vignette"
+name = "Vignette"
+description = "Dim the outer corners slightly; off by default."
+type = "bool"
+default = false
+
+[[pages]]
+id = "main"
+name = "Sunsun Shader"
+items = ["quality", "exposure", "clouds", "shadows", "haze", "water_reflections", "weather_detail", "bloom", "page:camera"]
+
+[[pages]]
+id = "camera"
+name = "Camera"
+description = "Optional camera effects, all off by default."
+items = ["depth_of_field", "camera_motion_blur", "vignette"]
 
 [budget]
 # Medium target at 1920x1080; no hardware timing is available yet.

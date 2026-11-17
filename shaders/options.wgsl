@@ -11,3 +11,8 @@ override water_waves: f32 = 1.0;
 
 override clouds: bool = true;
 override weather_detail: bool = true;
+
+override bloom: f32 = 0.10;
+override depth_of_field: bool = false;
+override camera_motion_blur: bool = false;
+override vignette: bool = false;

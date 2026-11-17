@@ -19,11 +19,11 @@ fn ss_surface_light(
     let day = ss_daylight();
     let night = ss_moonlight();
     let open = pow(clamp(light.y, 0.0, 1.0), 2.4);
-    let sky_direction = 0.55 + 0.45 * max(normal.y, 0.0);
+    let sky_direction = 0.65 + 0.35 * max(normal.y, 0.0);
     let cloud_dimming = 1.0 - frame.rain * 0.72;
     let diffuse = max(dot(normal, frame.sun_direction), 0.0);
     let moon_diffuse = max(dot(normal, frame.moon_direction), 0.0);
-    let blue_fill = mix(vec3<f32>(0.13, 0.21, 0.38), vec3<f32>(0.34, 0.43, 0.55), frame.rain);
+    let blue_fill = mix(vec3<f32>(0.19, 0.27, 0.40), vec3<f32>(0.34, 0.43, 0.55), frame.rain);
     let sun = ss_sun_color() * (1.5 * diffuse * day * cloud_dimming);
     let moon = vec3<f32>(0.065, 0.10, 0.19) * moon_diffuse * night;
     let transmitted = pow(max(dot(view, -frame.sun_direction), 0.0), 5.0)
