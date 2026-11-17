@@ -308,6 +308,8 @@ fn ss_cumulus_transport(ray: vec3<f32>, behind: vec3<f32>, origin_world: vec3<f3
         if seed.z >= 0.30 {
             var mass = 0.0;
             var weighted_front = 0.0;
+            var weighted_resolved = 0.0;
+            var weighted_bulk_depth = 0.0;
             for (var i = 0u; i < 5u; i += 1u) {
                 if i >= ss_cumulus_count(seed) { break; }
                 let original = ss_cumulus_lobe(cell, seed, i);
@@ -315,30 +317,51 @@ fn ss_cumulus_transport(ray: vec3<f32>, behind: vec3<f32>, origin_world: vec3<f3
                 if reflected { lobe = ss_cumulus_cone_lobe(original, cell, origin, ray, angular_cone); }
                 let chord = ss_cumulus_eroded_chord(lobe,
                     origin, ray, start, finish, true, sample_cap, angular_cone);
-                let filtered_mass = chord.z * ss_cumulus_cone_mass(original, lobe);
+                let normalization = ss_cumulus_cone_mass(original, lobe);
+                let filtered_mass = chord.z * normalization;
                 mass += filtered_mass;
                 weighted_front += mix(chord.x, chord.y, 0.31) * filtered_mass;
+                if reflected && filtered_mass > 0.0001 {
+                    // A broadened support does not resolve its original rim or
+                    // point self-shadow. Filter radiance as well as density.
+                    weighted_resolved += filtered_mass * smoothstep(0.30, 0.90, normalization);
+                    // Mean column mass of a parabolic ellipsoid is 8/15 of
+                    // its light-direction half extent. Its depth integral
+                    // below supplies a bounded bulk-light response.
+                    let light_axis = light / original.radius;
+                    let mean_column = (8.0 / 15.0) / sqrt(dot(light_axis, light_axis));
+                    weighted_bulk_depth += filtered_mass * mean_column * (0.036 * 0.72);
+                }
             }
             if mass > 0.001 {
                 let distance = weighted_front / mass;
                 let point = origin + ray * distance;
+                let resolved = select(1.0, clamp(weighted_resolved / mass, 0.0, 1.0), reflected);
                 var light_mass = 0.0;
-                for (var i = 0u; i < 5u; i += 1u) {
-                    if i >= ss_cumulus_count(seed) { break; }
-                    // Broad transport is filtered at the light's angular size.
-                    // Detail stays in the visible extinction, not a noisy light.
-                    let original = ss_cumulus_lobe(cell, seed, i);
-                    var lobe = original;
-                    if reflected { lobe = ss_cumulus_cone_lobe(original, cell, origin, ray, angular_cone); }
-                    light_mass += ss_cumulus_chord(lobe,
-                        point, light, 0.0, 1000.0).z * 0.72 * ss_cumulus_cone_mass(original, lobe);
+                if resolved > 0.001 {
+                    for (var i = 0u; i < 5u; i += 1u) {
+                        if i >= ss_cumulus_count(seed) { break; }
+                        let original = ss_cumulus_lobe(cell, seed, i);
+                        var lobe = original;
+                        if reflected { lobe = ss_cumulus_cone_lobe(original, cell, origin, ray, angular_cone); }
+                        light_mass += ss_cumulus_chord(lobe,
+                            point, light, 0.0, 1000.0).z * 0.72 * ss_cumulus_cone_mass(original, lobe);
+                    }
                 }
-                let lit = exp(-light_mass * 0.036);
+                var lit = exp(-light_mass * 0.036);
+                if reflected {
+                    let optical_depth = max(weighted_bulk_depth / mass, 0.0001);
+                    // Integral of exp(-t) over a finite representative column.
+                    // Averaging this nonlinear response fills unresolved cloud
+                    // masses instead of enlarging their bright boundary shells.
+                    let bulk_light = (1.0 - exp(-optical_depth)) / optical_depth;
+                    lit = mix(bulk_light, lit, resolved);
+                }
                 let height = ss_saturate((point.y - ss_cumulus_base(seed)) / 135.0);
                 let thin_rim = exp(-mass * 0.027) * (1.0 - exp(-mass * 0.20));
                 let source = ambient * (0.65 + 0.65 * height)
                     + (sun_colour * (0.055 + lit * 1.25) + moon_colour * (0.18 + lit * 0.82))
-                    + sun_colour * forward * thin_rim * (0.85 + dusk * 0.35)
+                    + sun_colour * forward * thin_rim * resolved * (0.85 + dusk * 0.35)
                     + sun_colour * dusk * (1.0 - height) * 0.045;
                 let air_mix = 1.0 - exp(-max(distance - 700.0, 0.0) / 5200.0);
                 let fade = 1.0 - smoothstep(range * 0.72, range, distance);
@@ -401,13 +424,38 @@ fn ss_cloud_volume(ray: vec3<f32>, behind: vec3<f32>, origin_world: vec3<f32>,
         ss_stratus_volume(ray, behind, origin_world, max_distance), storm);
 }
 
-fn ss_cloud_density_filtered(position: vec3<f32>, footprint: f32) -> f32 {
-    let base_variation = ss_noise3(vec3<f32>(position.x * 0.0035, 8.9, position.z * 0.0035)) * 22.0;
-    let height = (position.y - SS_CLOUD_BASE - base_variation) / (SS_CLOUD_HEIGHT - base_variation);
-    let layer = smoothstep(0.0, 0.12, height) * (1.0 - smoothstep(0.57, 1.0, height));
-    if layer <= 0.001 {
-        return 0.0;
+// Primitive of one smoothstep. The two cloud-height ramps do not overlap,
+// so their difference integrates the vertical envelope exactly, without
+// introducing another ray or density evaluation.
+fn ss_cloud_ramp_integral(height: f32, lower: f32, upper: f32) -> f32 {
+    let span = upper - lower;
+    let t = clamp((height - lower) / span, 0.0, 1.0);
+    return span * (t * t * t - 0.5 * t * t * t * t) + max(height - upper, 0.0);
+}
+
+fn ss_cloud_layer_integral(height: f32) -> f32 {
+    return ss_cloud_ramp_integral(height, 0.0, 0.12)
+        - ss_cloud_ramp_integral(height, 0.57, 1.0);
+}
+
+fn ss_cloud_density_segment(position: vec3<f32>, footprint: f32, vertical_span: f32) -> f32 {
+    let base_weight = 1.0 - smoothstep(35.0, 145.0, footprint);
+    var base_variation = 11.0;
+    if base_weight > 0.001 {
+        base_variation = mix(11.0,
+            ss_noise3(vec3<f32>(position.x * 0.0035, 8.9, position.z * 0.0035)) * 22.0,
+            base_weight);
     }
+    let layer_height = SS_CLOUD_HEIGHT - base_variation;
+    let height = (position.y - SS_CLOUD_BASE - base_variation) / layer_height;
+    let half_span = max(vertical_span, 0.0) * 0.5 / layer_height;
+    if height + half_span <= 0.0 || height - half_span >= 1.0 { return 0.0; }
+    var layer = smoothstep(0.0, 0.12, height) * (1.0 - smoothstep(0.57, 1.0, height));
+    if half_span > 0.0005 {
+        layer = (ss_cloud_layer_integral(height + half_span)
+            - ss_cloud_layer_integral(height - half_span)) / (2.0 * half_span);
+    }
+    if layer <= 0.001 { return 0.0; }
     let wind = ss_periodic_drift(vec2<f32>(0.0012, 0.00045));
     let drift = vec3<f32>(wind.x, 0.0, wind.y);
     // Average frequencies a long march segment cannot resolve. This removes
@@ -436,6 +484,10 @@ fn ss_cloud_density_filtered(position: vec3<f32>, footprint: f32) -> f32 {
     }
     let mass = smoothstep(lower, upper, broad + detail * 0.21);
     return mass * layer * 0.70;
+}
+
+fn ss_cloud_density_filtered(position: vec3<f32>, footprint: f32) -> f32 {
+    return ss_cloud_density_segment(position, footprint, 0.0);
 }
 
 fn ss_cloud_density(position: vec3<f32>) -> f32 {
@@ -556,12 +608,19 @@ fn ss_stratus_volume(ray: vec3<f32>, behind: vec3<f32>, origin_world: vec3<f32>,
         let stride = (finish - start) * (far_step - near_step);
         let distance = start + (finish - start) * (near_step + far_step) * 0.5;
         let point = origin_world + ray * distance;
-        let density = ss_cloud_density_filtered(point, stride);
+        let pixel_angle = 2.0 / max(frame.resolution.y * abs(frame.projection[1].y), 1.0);
+        let footprint = max(stride, distance * pixel_angle);
+        let vertical_span = abs(ray.y) * stride;
+        let density = ss_cloud_density_segment(point, footprint, vertical_span);
         if density > 0.003 {
-            var shadow_mass = ss_cloud_density(point + light_direction * 28.0) * 42.0;
+            // The light response must resolve the same finite march segment;
+            // point-sampled base/noise lighting would reintroduce horizon bands.
+            var shadow_mass = ss_cloud_density_segment(point + light_direction * 28.0,
+                footprint, vertical_span) * 42.0;
             if quality >= 2u {
                 shadow_mass = shadow_mass * 0.65
-                    + ss_cloud_density(point + light_direction * 68.0) * 46.0;
+                    + ss_cloud_density_segment(point + light_direction * 68.0,
+                        footprint, vertical_span) * 46.0;
             }
             let light_transmission = exp(-shadow_mass * 0.052);
             let height = ss_saturate((point.y - SS_CLOUD_BASE) / SS_CLOUD_HEIGHT);

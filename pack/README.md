@@ -22,7 +22,7 @@ Medium adds eight-sample contact depth, reflected cloud volumes and screen-space
 shore reflections. High increases cloud, shadow and reflection sampling and enables
 the depth-limited light-shaft integral. All three use the real sun/moon shadow map.
 
-Controls cover exposure, air density, clouds, shadows, terrain reflections, contact
+Controls cover exposure, air density, clouds, shadows, terrain reflections, wave strength, contact
 shading, plant wind, weather detail and bloom. Depth of field, camera motion blur
 and vignette are off by default. Wind is used in both terrain and shadow vertices.
 The declared 4 ms budget at 1920×1080 is a design target, not a measured GPU result;

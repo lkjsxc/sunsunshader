@@ -153,6 +153,16 @@ default = true
 
 
 [[options]]
+id = "water_waves"
+name = "Wave strength"
+description = "Adjust the surface waves; zero gives a calm surface."
+type = "float"
+default = 1.0
+min = 0.0
+max = 1.5
+step = 0.1
+
+[[options]]
 id = "clouds"
 name = "Clouds"
 description = "Draw low cloud volumes, thin high clouds and their shade."
@@ -200,7 +210,7 @@ default = false
 [[pages]]
 id = "main"
 name = "Sunsun Shader"
-items = ["quality", "exposure", "clouds", "shadows", "haze", "water_reflections", "weather_detail", "contact_shading", "wind", "light_shafts", "bloom", "page:camera"]
+items = ["quality", "exposure", "clouds", "shadows", "haze", "water_reflections", "water_waves", "weather_detail", "contact_shading", "wind", "light_shafts", "bloom", "page:camera"]
 
 [[pages]]
 id = "camera"

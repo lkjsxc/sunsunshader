@@ -114,11 +114,11 @@ fn ss_atmosphere(direction: vec3<f32>) -> vec3<f32> {
     // finite-column fit is blended with a diffuse sky fit rather than a white
     // multiple-scattering pedestal. The forward aerosol lobe stays directional.
     let clear_day = smoothstep(0.10, 0.44, solar_height) * (1.0 - frame.rain);
-    let blue_gradient = mix(vec3<f32>(0.205, 0.405, 0.72),
-        vec3<f32>(0.026, 0.118, 0.355), pow(elevation, 0.48));
+    let blue_gradient = mix(vec3<f32>(0.120, 0.280, 0.550),
+        vec3<f32>(0.021, 0.095, 0.300), pow(elevation, 0.48));
     let aureole = ss_phase_aerosol(solar_cosine, 0.78) * 0.025
         * ss_sun_color() * smoothstep(0.0, 0.20, solar_height);
-    colour = mix(colour, blue_gradient + aureole, clear_day * 0.82);
+    colour = mix(colour, blue_gradient + aureole, clear_day * 0.90);
 
     // Long paths through the Earth's shadow retain a rose belt and violet air.
     let twilight = exp(-pow((solar_height + 0.045) / 0.16, 2.0));
@@ -133,10 +133,12 @@ fn ss_atmosphere(direction: vec3<f32>) -> vec3<f32> {
         vec3<f32>(0.0015, 0.0032, 0.009), pow(elevation, 0.45));
     colour += night_air * night + vec3<f32>(0.009, 0.015, 0.025) * lunar_haze;
 
-    let rain_grey = dot(colour, vec3<f32>(0.2126, 0.7152, 0.0722));
-    let overcast = vec3<f32>(0.82, 0.88, 0.97) * rain_grey
-        + vec3<f32>(0.042, 0.052, 0.068) * diffuse_day;
-    colour = mix(colour, overcast, frame.rain * 0.72);
+    // Storm light is broad and subdued. Reusing the bright clear-air forward
+    // lobe as a grey value makes rain a white curtain at the horizon.
+    let storm_gradient = mix(vec3<f32>(0.180, 0.230, 0.300),
+        vec3<f32>(0.085, 0.120, 0.170), pow(elevation, 0.40));
+    let overcast = storm_gradient * diffuse_day + night_air * night * 0.55;
+    colour = mix(colour, overcast, frame.rain * 0.92);
     colour *= 1.0 - 0.43 * frame.thunder;
     return max(colour, vec3<f32>(0.0));
 }
