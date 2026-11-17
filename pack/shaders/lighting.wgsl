@@ -18,7 +18,8 @@ fn ss_surface_light(
 ) -> vec3<f32> {
     let day = ss_daylight();
     let night = ss_moonlight();
-    let open = pow(clamp(light.y, 0.0, 1.0), 2.4);
+    let sky_level = clamp(light.y, 0.0, 1.0);
+    let open = pow(sky_level, 2.4);
     let sky_direction = 0.65 + 0.35 * max(normal.y, 0.0);
     let cloud_dimming = 1.0 - frame.rain * 0.72;
     let diffuse = max(dot(normal, frame.sun_direction), 0.0);
@@ -32,6 +33,26 @@ fn ss_surface_light(
         blue_fill * sky_direction * (0.12 + 0.70 * day)
         + (sun + moon + ss_sun_color() * transmitted) * visibility
     );
+    if frame.dimension == 0 {
+        // Skylight is a visibility signal. Indirect sky light survives beneath
+        // leaves without letting the direct sun reach enclosed surfaces.
+        // Ease only the high-sun response: the established twilight stays intact.
+        let high_sun = smoothstep(0.10, 0.42, frame.sun_direction.y)
+            * (1.0 - frame.rain * 0.50);
+        let indirect_open = mix(open, pow(sky_level, 1.20), high_sun);
+        let deep_night = night * (1.0 - smoothstep(-0.35, -0.20, frame.sun_direction.y));
+        let clear_fill = blue_fill + vec3<f32>(0.040, 0.065, 0.100) * high_sun;
+        // Redistribute daylight toward open shade using the shadow result
+        // already available. This leaves the sunlit response and caves intact.
+        let shaded = 1.0 - clamp(dot(visibility, vec3<f32>(1.0 / 3.0)), 0.0, 1.0);
+        let shade_fill = 1.0 + 0.85 * high_sun * shaded;
+        let indirect = clear_fill * (0.12 + 0.70 * day) * shade_fill
+            + vec3<f32>(0.012, 0.025, 0.050) * deep_night;
+        let clear_sun = sun * (1.0 + high_sun * 0.08);
+        let clear_moon = moon + vec3<f32>(0.065, 0.11, 0.17) * moon_diffuse * deep_night;
+        illumination = indirect_open * indirect * sky_direction
+            + open * (clear_sun + clear_moon + ss_sun_color() * transmitted) * visibility;
+    }
     if frame.dimension == 1 {
         let island_facing = max(dot(normal, frame.light_direction), 0.0);
         illumination = vec3<f32>(0.11, 0.12, 0.20) * (0.55 + 0.45 * max(normal.y, 0.0))

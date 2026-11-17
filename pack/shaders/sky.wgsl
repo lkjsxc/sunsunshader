@@ -22,13 +22,13 @@ fn ss_star_layer(ray: vec3<f32>, density: f32, seed: i32) -> vec3<f32> {
         ss_hash3(cell + vec3<i32>(11, 89, 0)));
     let centre = 0.15 + jitter * 0.70;
     let offset = fract(coordinate) - centre;
-    let radius = mix(0.045, 0.115, ss_hash3(cell + vec3<i32>(19, 31, 0)));
+    let radius = mix(0.050, 0.130, ss_hash3(cell + vec3<i32>(19, 31, 0)));
     let pixel = max(length(fwidth(coordinate)) * 0.48, 0.025);
     let core = 1.0 - smoothstep(max(radius - pixel, 0.0), radius + pixel, length(offset));
     let energy = min(1.0, radius * radius / (pixel * pixel));
     let temperature = ss_hash3(cell + vec3<i32>(7, 47, 0));
     let colour = mix(vec3<f32>(0.72, 0.83, 1.0), vec3<f32>(1.0, 0.82, 0.64), temperature);
-    return colour * core * energy * presence * 3.8;
+    return colour * core * energy * presence * 4.6;
 }
 
 fn ss_starfield(ray: vec3<f32>) -> vec3<f32> {

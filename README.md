@@ -28,13 +28,15 @@ Put the resulting `.hshader` into `shaderpacks/`. Keep only one installed copy.
 
 **Medium is the default.** Profiles change cloud, shadow-filter, reflection, light-shaft and edge-filter work.
 
-| Profile | Cloud samples | Shadow filter | Water terrain reflection |
+| Profile | Cloud cells / storm steps | Shadow filter | Water terrain reflection |
 |---|---:|---:|---|
 | Low | 6 | 4 taps | Sky only |
 | Medium | 12 | 8 taps | Screen space |
 | High | 18 | 12 taps | Screen space; optional experimental rays |
 | Ultra | 28 | 16 taps | Longer screen search; optional experimental rays |
 
+Clear clouds use exact integration through up to the listed number of cells; storm clouds use the listed march steps.
+The clear and storm fields blend as weather changes. No extra texture reads are needed for the clear cloud shape.
 High and Ultra also reflect the cloud volume. The shadow map is 1536×1536 in every profile.
 Ray reflections are off by default. They require High or Ultra and a ray-capable Horizon device;
 screen space remains the fallback.
@@ -68,6 +70,7 @@ cloud volumes. Water waves change normals and refraction, not the mesh. Caustics
 Snow and auroras use the biome at the camera because per-surface biome data is unavailable. Wet ground has sky
 and sun gloss, not terrain reflections. Dropped and framed items, particles and the first-person hand retain engine lighting;
 some native draws can receive additional post fog. Temporal accumulation and object motion blur are absent.
+Clear clouds have deliberately smooth shapes; heavy rain can retain shallow-angle layering.
 
 Screenshots are actual frozen Horizon frames rendered with Mesa Lavapipe, at 960×540 and ten chunks.
 They demonstrate appearance, not GPU performance.
