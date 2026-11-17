@@ -233,8 +233,17 @@ fn ss_water_reflection(input: MaterialInput, normal: vec3<f32>) -> vec3<f32> {
     // filtered path has a smaller transport budget, not a different sky.
     if quality >= 1u && frame.eye_in != 1u {
         let pixel_angle = 2.0 / max(frame.resolution.y * abs(frame.projection[1].y), 1.0);
-        let angular_cone = clamp(pixel_angle + ss_water_footprint(input) * 0.10,
-            pixel_angle, 0.06);
+        let footprint = ss_water_footprint(input);
+        let normal_cone = clamp(pixel_angle + footprint * 0.10, pixel_angle, 0.06);
+        let unresolved = smoothstep(0.08, 1.8, footprint);
+        let roughness = 0.060 + frame.rain * 0.028 + unresolved * 0.045;
+        // The cloud helper expects a full angular diameter. Two times the
+        // GGX slope width is a conservative filtered core, not its long tails.
+        // Combine material roughness and the pixel/normal footprint in
+        // quadrature; unresolved ripples blur the reflected cloud support too.
+        let roughness_cone = 2.0 * roughness;
+        let angular_cone = sqrt(normal_cone * normal_cone
+            + roughness_cone * roughness_cone);
         sky = ss_cloud_reflection(sky, direction,
             input.position + frame.camera_position, angular_cone);
     }

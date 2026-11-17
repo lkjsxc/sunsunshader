@@ -10,12 +10,14 @@ fn post(input: PostInput) -> vec4<f32> {
     let toe = luma * (luma + 0.045) / (luma + 0.060);
     let mapped = 1.0 - exp(-toe * 1.55);
     var color = scene * (mapped / max(luma, 0.00001));
-    let shoulder = smoothstep(0.48, 2.6, luma) * 0.50;
+    // Roll the brightest channel smoothly inside the display gamut. Fitting
+    // a saturated emitter toward display white erases its orange/red identity.
+    // The small neutral shoulder allows hot cores without whitening whole lava.
+    let shoulder = smoothstep(0.65, 3.5, luma) * 0.08;
     color = mix(color, vec3<f32>(mapped), shoulder);
     let peak = max(color.r, max(color.g, color.b));
-    if peak > 1.0 {
-        let excess = (peak - 1.0) / max(peak - mapped, 0.00001);
-        color = mix(color, vec3<f32>(mapped), clamp(excess, 0.0, 1.0));
-    }
+    let over = max(peak - 0.78, 0.0);
+    let peak_mapped = min(peak, 0.78) + 0.22 * (1.0 - exp(-over / 0.22));
+    color *= peak_mapped / max(peak, 0.00001);
     return vec4<f32>(ss_encode(color), 1.0);
 }

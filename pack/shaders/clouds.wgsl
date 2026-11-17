@@ -14,6 +14,7 @@ struct SSCumulusLobe {
     centre: vec3<f32>,
     radius: vec3<f32>,
     base: f32,
+    feather: f32,
 }
 
 fn ss_cumulus_seed(cell: vec2<i32>) -> vec4<f32> {
@@ -76,7 +77,38 @@ fn ss_cumulus_lobe(cell: vec2<i32>, seed: vec4<f32>, index: u32) -> SSCumulusLob
     let base = ss_cumulus_base(seed);
     radius.y = min(radius.y, (SS_CUMULUS_TOP - 4.0 - base) / (1.0 + lift));
     return SSCumulusLobe(centre + vec3<f32>(turned.x, base + lift * radius.y, turned.y),
-        radius, base);
+        radius, base, 13.0);
+}
+
+// Approximate spatial convolution of a parabolic lobe by one finite cone.
+// The normalized density (1-r^2) has diagonal second moment R_i^2/7.
+// A uniform circular footprint of diameter D has transverse variance D^2/16.
+// Match those moments, then preserve the untruncated lobe's density integral.
+// Off-diagonal covariance and the clipped base are approximations. Bounding the
+// widened support to the existing cell preserves the traversal's culling.
+fn ss_cumulus_cone_lobe(lobe: SSCumulusLobe, cell: vec2<i32>,
+    origin: vec3<f32>, ray: vec3<f32>, angular_diameter: f32) -> SSCumulusLobe {
+    let distance = max(dot(lobe.centre - origin, ray), 0.0);
+    let diameter = distance * angular_diameter;
+    let added = (7.0 / 16.0) * diameter * diameter
+        * max(vec3<f32>(1.0) - ray * ray, vec3<f32>(0.0));
+    let cell_centre = (vec2<f32>(cell) + 0.5) * SS_CUMULUS_CELL;
+    let horizontal_limit = vec2<f32>(197.0) - abs(lobe.centre.xz - cell_centre);
+    let limit = vec3<f32>(horizontal_limit.x,
+        SS_CUMULUS_TOP - 4.0 - lobe.centre.y, horizontal_limit.y);
+    let radius = min(sqrt(lobe.radius * lobe.radius + added), max(limit, lobe.radius));
+    // Preserve the midpoint of the original base transition while softening it.
+    // Its lower edge remains inside the common vertical slab.
+    let base_midpoint = lobe.base + lobe.feather * 0.5;
+    let base_limit = max(lobe.feather, 2.0 * (base_midpoint - SS_CUMULUS_BOTTOM - 3.0));
+    let feather = min(sqrt(lobe.feather * lobe.feather + added.y * (36.0 / 7.0)),
+        base_limit);
+    return SSCumulusLobe(lobe.centre, radius, base_midpoint - feather * 0.5, feather);
+}
+
+fn ss_cumulus_cone_mass(original: SSCumulusLobe, filtered: SSCumulusLobe) -> f32 {
+    return (original.radius.x * original.radius.y * original.radius.z)
+        / max(filtered.radius.x * filtered.radius.y * filtered.radius.z, 0.001);
 }
 
 fn ss_cumulus_integral(depth: f32, a: f32, n: f32, f: f32) -> f32 {
@@ -106,7 +138,7 @@ fn ss_cumulus_chord(lobe: SSCumulusLobe, origin: vec3<f32>, ray: vec3<f32>,
     let y_near = origin.y + ray.y * near;
     let y_far = origin.y + ray.y * far;
     if max(y_near, y_far) <= lobe.base { return vec3<f32>(0.0); }
-    let feather = 13.0;
+    let feather = lobe.feather;
     if min(y_near, y_far) >= lobe.base + feather {
         let mass = ss_cumulus_integral(depth, a, near - middle, far - middle);
         return vec3<f32>(near, far, max(mass, 0.0));
@@ -159,7 +191,7 @@ fn ss_cumulus_density(lobe: SSCumulusLobe, point: vec3<f32>, footprint: f32) -> 
         let fringe = ss_noise3(point * 0.235 + vec3<f32>(9.1, 53.7, 2.3));
         erosion += (0.5 - fringe) * 0.10 * (1.0 - smoothstep(1.5, 5.0, footprint));
     }
-    let feather = smoothstep(0.0, 13.0, point.y - lobe.base);
+    let feather = smoothstep(0.0, lobe.feather, point.y - lobe.base);
     return max(support - clamp(erosion, 0.015, 0.49), 0.0) * feather;
 }
 
@@ -255,7 +287,7 @@ fn ss_cumulus_transport(ray: vec3<f32>, behind: vec3<f32>, origin_world: vec3<f3
     let sunlit = smoothstep(-0.18, 0.06, frame.sun_direction.y);
     let sun_colour = ss_sun_color() * sunlit * (1.0 - frame.thunder * 0.45);
     let ambient = mix(vec3<f32>(0.002, 0.0045, 0.011),
-        vec3<f32>(0.115, 0.185, 0.30), smoothstep(-0.16, 0.20, frame.sun_direction.y));
+        vec3<f32>(0.135, 0.200, 0.30), smoothstep(-0.16, 0.20, frame.sun_direction.y));
     let moon_colour = vec3<f32>(0.022, 0.038, 0.075) * ss_moonlight();
     let light = select(frame.moon_direction, frame.sun_direction, sunlit > 0.05);
     let forward = pow(max(dot(ray, frame.sun_direction), 0.0), 12.0);
@@ -278,10 +310,14 @@ fn ss_cumulus_transport(ray: vec3<f32>, behind: vec3<f32>, origin_world: vec3<f3
             var weighted_front = 0.0;
             for (var i = 0u; i < 5u; i += 1u) {
                 if i >= ss_cumulus_count(seed) { break; }
-                let chord = ss_cumulus_eroded_chord(ss_cumulus_lobe(cell, seed, i),
+                let original = ss_cumulus_lobe(cell, seed, i);
+                var lobe = original;
+                if reflected { lobe = ss_cumulus_cone_lobe(original, cell, origin, ray, angular_cone); }
+                let chord = ss_cumulus_eroded_chord(lobe,
                     origin, ray, start, finish, true, sample_cap, angular_cone);
-                mass += chord.z;
-                weighted_front += mix(chord.x, chord.y, 0.31) * chord.z;
+                let filtered_mass = chord.z * ss_cumulus_cone_mass(original, lobe);
+                mass += filtered_mass;
+                weighted_front += mix(chord.x, chord.y, 0.31) * filtered_mass;
             }
             if mass > 0.001 {
                 let distance = weighted_front / mass;
@@ -291,15 +327,19 @@ fn ss_cumulus_transport(ray: vec3<f32>, behind: vec3<f32>, origin_world: vec3<f3
                     if i >= ss_cumulus_count(seed) { break; }
                     // Broad transport is filtered at the light's angular size.
                     // Detail stays in the visible extinction, not a noisy light.
-                    light_mass += ss_cumulus_chord(ss_cumulus_lobe(cell, seed, i),
-                        point, light, 0.0, 1000.0).z * 0.72;
+                    let original = ss_cumulus_lobe(cell, seed, i);
+                    var lobe = original;
+                    if reflected { lobe = ss_cumulus_cone_lobe(original, cell, origin, ray, angular_cone); }
+                    light_mass += ss_cumulus_chord(lobe,
+                        point, light, 0.0, 1000.0).z * 0.72 * ss_cumulus_cone_mass(original, lobe);
                 }
                 let lit = exp(-light_mass * 0.036);
                 let height = ss_saturate((point.y - ss_cumulus_base(seed)) / 135.0);
                 let thin_rim = exp(-mass * 0.027) * (1.0 - exp(-mass * 0.20));
-                let source = ambient * (0.55 + 0.75 * height)
+                let source = ambient * (0.65 + 0.65 * height)
                     + (sun_colour * (0.055 + lit * 1.25) + moon_colour * (0.18 + lit * 0.82))
-                    + sun_colour * forward * thin_rim * (1.2 + dusk * 0.8);
+                    + sun_colour * forward * thin_rim * (0.85 + dusk * 0.35)
+                    + sun_colour * dusk * (1.0 - height) * 0.045;
                 let air_mix = 1.0 - exp(-max(distance - 700.0, 0.0) / 5200.0);
                 let fade = 1.0 - smoothstep(range * 0.72, range, distance);
                 let opacity = (1.0 - exp(-mass * 0.052)) * fade;

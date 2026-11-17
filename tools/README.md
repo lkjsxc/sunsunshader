@@ -5,8 +5,8 @@ Python 3.11+, Git, and stable Rust are required. Publishing also requires an alr
 ```sh
 python3 tools/release.py check --self-test
 python3 tools/release.py build
-python3 tools/release.py check dist/sunsunshader-0.1.1.hshader --target nightly
-python3 tools/release.py release dist/sunsunshader-0.1.1.hshader --notes release-notes.md
+python3 tools/release.py check dist/sunsunshader-0.2.0-rc1.hshader --target nightly
+python3 tools/release.py release dist/sunsunshader-0.2.0-rc1.hshader --notes release-notes.md --prerelease
 ```
 
 `check` without a file and `build` both build and check the Nightly and development archives. Select one with
@@ -21,7 +21,7 @@ well. Negative tests exercise an unknown field in a ZIP and an API 0.2 archive w
 the normal game refuses. No experimental environment flag qualifies as release compatibility.
 
 The admission source digest in the pin records the audited game rule. A pin update requires reviewing that
-source, its API and renderer changes, adapting the pack, running this gate, and repeating the six game captures
+source, its API and renderer changes, adapting the pack, running this gate, and repeating the scene comparisons and motion captures
 using the exact final archive. Update the player-visible game version and screenshots before releasing.
 Never replace the Nightly pin with an arbitrary development commit. The development target is separate.
 
@@ -39,3 +39,7 @@ the current pack and requires byte identity. It then requires clean committed `m
 `origin/main`, and any existing version tag to name that commit. Only after these checks does it create the
 GitHub release with the checked Nightly archive, checksum and receipt. `--dry-run` performs the same checks
 without a GitHub write. The development archive is not published by this command.
+
+Release candidates use `--prerelease`. The tool also marks any version containing a hyphen
+as a GitHub pre-release automatically, so an `-rc` archive cannot silently become a stable release.
+This flag does not relax compatibility, source identity, cleanliness or pushed-commit checks.

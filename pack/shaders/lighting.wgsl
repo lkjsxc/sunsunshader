@@ -16,9 +16,9 @@ fn ss_surface_light(
     let day = ss_daylight();
     let night = ss_moonlight();
     let sky_level = clamp(light.y, 0.0, 1.0);
-    let open = pow(sky_level, 1.35);
+    let open = pow(sky_level, 0.95);
     let up = max(normal.y, 0.0);
-    let sky_direction = 0.58 + 0.42 * up;
+    let sky_direction = 0.66 + 0.34 * up;
     let rain = frame.rain;
     let direct_weather = 1.0 - rain * 0.88;
     let ndl = max(dot(normal, frame.sun_direction), 0.0);
@@ -28,7 +28,7 @@ fn ss_surface_light(
     let direct_open = select(pow(sky_level, 2.2), smoothstep(0.015, 0.38, sky_level),
         shadows && frame.has_shadow != 0u);
     let sky_fill = mix(vec3<f32>(0.235, 0.31, 0.45), vec3<f32>(0.31, 0.34, 0.39), rain);
-    let sky = sky_fill * (0.78 * day) + vec3<f32>(0.016, 0.023, 0.038) * night;
+    let sky = sky_fill * (0.78 * day) + vec3<f32>(0.034, 0.050, 0.080) * night;
     let bounce = vec3<f32>(0.070, 0.058, 0.040) * day * (1.0 - rain * 0.45)
         * (0.75 - 0.40 * up);
     let sunlight = ss_sun_color() * (1.72 * ndl * day * direct_weather);
