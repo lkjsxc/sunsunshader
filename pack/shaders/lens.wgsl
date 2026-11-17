@@ -14,11 +14,11 @@ fn post(input: PostInput) -> vec4<f32> {
         let south = ss_lens_read(input.uv + vec2<f32>(0.0, texel.y));
         let west = ss_lens_read(input.uv - vec2<f32>(texel.x, 0.0));
         let east = ss_lens_read(input.uv + vec2<f32>(texel.x, 0.0));
-        let vertical = abs(dot(north - south, frame.luminance));
-        let horizontal = abs(dot(west - east, frame.luminance));
-        let luma = dot(color, frame.luminance);
-        let neighbour_luma = vec4<f32>(dot(north, frame.luminance), dot(south, frame.luminance),
-            dot(west, frame.luminance), dot(east, frame.luminance));
+        let vertical = abs(dot(north - south, vec3<f32>(0.2126, 0.7152, 0.0722)));
+        let horizontal = abs(dot(west - east, vec3<f32>(0.2126, 0.7152, 0.0722)));
+        let luma = dot(color, vec3<f32>(0.2126, 0.7152, 0.0722));
+        let neighbour_luma = vec4<f32>(dot(north, vec3<f32>(0.2126, 0.7152, 0.0722)), dot(south, vec3<f32>(0.2126, 0.7152, 0.0722)),
+            dot(west, vec3<f32>(0.2126, 0.7152, 0.0722)), dot(east, vec3<f32>(0.2126, 0.7152, 0.0722)));
         let minimum = min(luma, min(min(neighbour_luma.x, neighbour_luma.y), min(neighbour_luma.z, neighbour_luma.w)));
         let maximum = max(luma, max(max(neighbour_luma.x, neighbour_luma.y), max(neighbour_luma.z, neighbour_luma.w)));
         let contrast = (maximum - minimum) / (0.04 + maximum);

@@ -52,7 +52,9 @@ fn ss_air_shafts(position: vec3<f32>, pixel: vec2<f32>) -> vec3<f32> {
     return ss_sun_color() * scattered * day * outside * 0.14 * (1.0 - 0.78 * frame.thunder);
 }
 
-fn post(input: PostInput) -> vec4<f32> {
+fn post(source: PostInput) -> vec4<f32> {
+    var input = source;
+    input.color = vec4<f32>(ss_decode(source.color.rgb), source.color.a);
     if input.depth <= 0.0000001 {
         let direction = ss_screen_direction(input.uv);
         var background = input.color.rgb;

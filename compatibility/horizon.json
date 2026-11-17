@@ -1,0 +1,31 @@
+{
+  "schema": 1,
+  "targets": {
+    "nightly": {
+      "repository": "https://github.com/horizon-rust/horizon.git",
+      "tag": "nightly-source/2026-11-13-9f42064",
+      "revision": "9f42064c11efe7ef3e5ed2baad7ddc2a3b36eea0",
+      "game_version": "Nightly 2026-11-13 · 9f42064",
+      "launcher_version": "nightly-2026-11-13-9f42064",
+      "pack_directory": "pack",
+      "normal_game_api": "0.1",
+      "forbidden_sections": [
+        "frame",
+        "entity",
+        "tonemap",
+        "ray_tracing"
+      ],
+      "admission_source": {
+        "path": "crates/horizon-client/src/game/native_shaders.rs",
+        "sha256": "5012ab6b04edaf6badcdb99c12dedeadd6a573be293b8c20b6467980d7cfc525"
+      }
+    },
+    "main": {
+      "repository": "https://github.com/horizon-rust/horizon.git",
+      "revision": "5a2ae74b9d702ee9cdf6dc5ee13e97dfe5a80d80",
+      "game_version": "Development main (2026-11-17 API snapshot)",
+      "pack_directory": "pack-main",
+      "normal_game_api": "0.2"
+    }
+  }
+}

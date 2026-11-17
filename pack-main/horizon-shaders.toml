@@ -1,0 +1,221 @@
+schema = 1
+id = "sunsunshader"
+name = "Sunsun Shader"
+version = "0.1.1"
+api = "0.2"
+description = "Warm light, cool shade and weathered air."
+authors = ["lkjsxc"]
+license = "Apache-2.0"
+shared = ["shaders/options.wgsl", "shaders/atmosphere.wgsl", "shaders/clouds.wgsl", "shaders/lighting.wgsl", "shaders/fog.wgsl"]
+
+[frame]
+blend = "linear"
+fog = "pack"
+
+[sky]
+file = "shaders/sky.wgsl"
+sun = false
+stars = false
+clouds = false
+
+[material]
+file = "shaders/material.wgsl"
+files = ["shaders/shadows.wgsl", "shaders/water.wgsl"]
+
+[entity]
+file = "shaders/entity.wgsl"
+files = ["shaders/shadows.wgsl"]
+
+[[post]]
+file = "shaders/air.wgsl"
+files = ["shaders/shadows.wgsl"]
+name = "Air"
+
+[[post]]
+file = "shaders/bloom_seed.wgsl"
+name = "Bloom seed"
+output = "ss_bright"
+scale = 0.25
+
+[[post]]
+file = "shaders/bloom_horizontal.wgsl"
+name = "Bloom horizontal"
+output = "ss_blur"
+scale = 0.25
+
+[[post]]
+file = "shaders/bloom_vertical.wgsl"
+name = "Bloom vertical"
+output = "ss_bloom"
+scale = 0.25
+
+[[post]]
+file = "shaders/compose.wgsl"
+name = "Bloom and camera motion"
+
+[[post]]
+file = "shaders/focus.wgsl"
+name = "Optional focus"
+
+[[post]]
+file = "shaders/lens.wgsl"
+name = "Edge resolve"
+
+[weather]
+file = "shaders/weather.wgsl"
+
+[tonemap]
+file = "shaders/tonemap.wgsl"
+
+[[options]]
+id = "quality"
+name = "Profile"
+description = "Low, Medium, High or Ultra sampling; Medium is the default."
+type = "choice"
+values = ["Low", "Medium", "High", "Ultra"]
+default = "Medium"
+
+[[options]]
+id = "exposure"
+name = "Exposure"
+description = "Adjust overall brightness without changing the light colours."
+type = "float"
+default = 1.0
+min = 0.5
+max = 1.8
+step = 0.05
+
+[[options]]
+id = "haze"
+name = "Air density"
+description = "Set the amount of atmospheric haze and low fog."
+type = "float"
+default = 1.0
+min = 0.5
+max = 1.8
+step = 0.1
+
+[[tags]]
+id = "foliage"
+sprites = ["block/*_leaves", "block/short_grass", "block/tall_grass_*", "block/fern", "block/large_fern_*", "block/vine"]
+
+[[tags]]
+id = "ore"
+sprites = ["block/*_ore"]
+
+[[lights]]
+color = [1.0, 0.64, 0.32]
+blocks = ["torch", "wall_torch", "lantern", "campfire", "*candle*", "jack_o_lantern"]
+
+[[lights]]
+color = [0.32, 0.76, 1.0]
+blocks = ["soul_torch", "soul_wall_torch", "soul_lantern", "soul_campfire"]
+
+[[lights]]
+color = [1.0, 0.43, 0.12]
+blocks = ["lava", "fire", "magma_block"]
+
+[[lights]]
+color = [1.0, 0.22, 0.10]
+blocks = ["redstone_torch", "redstone_wall_torch", "redstone_lamp", "redstone_ore", "deepslate_redstone_ore"]
+
+[[lights]]
+color = [1.0, 0.88, 0.62]
+blocks = ["glowstone", "shroomlight", "ochre_froglight"]
+
+[[lights]]
+color = [0.61, 0.88, 0.94]
+blocks = ["sea_lantern", "end_rod"]
+
+[[lights]]
+color = [0.81, 0.68, 1.0]
+blocks = ["pearlescent_froglight", "amethyst_cluster", "large_amethyst_bud"]
+
+[shadow]
+resolution = 1536
+distance = 128.0
+option = "shadows"
+
+[ray_tracing]
+# The host selects capabilities at startup; Ray reflections gates queries only.
+
+[[options]]
+id = "shadows"
+name = "Shadows"
+description = "Draw filtered sun and moon shadows."
+type = "bool"
+default = true
+
+[[options]]
+id = "water_reflections"
+name = "Terrain reflections"
+description = "Reflect visible terrain in water; sky reflection remains when off."
+type = "bool"
+default = true
+
+[[options]]
+id = "ray_reflections"
+name = "Ray reflections"
+description = "Use experimental ray queries on High and Ultra, with a screen-space fallback."
+type = "bool"
+default = false
+
+[[options]]
+id = "clouds"
+name = "Clouds"
+description = "Draw low cloud volumes, thin high clouds and their shade."
+type = "bool"
+default = true
+
+[[options]]
+id = "weather_detail"
+name = "Weather detail"
+description = "Add wet surfaces, a light snow coat, rainbows and faint auroras."
+type = "bool"
+default = true
+
+[[options]]
+id = "bloom"
+name = "Bloom"
+description = "Set the strength of the soft glow around bright light."
+type = "float"
+default = 0.10
+min = 0.0
+max = 0.30
+step = 0.02
+
+[[options]]
+id = "depth_of_field"
+name = "Depth of field"
+description = "Focus at the centre of the screen; off by default."
+type = "bool"
+default = false
+
+[[options]]
+id = "camera_motion_blur"
+name = "Camera motion blur"
+description = "Blur camera movement; object motion is not available."
+type = "bool"
+default = false
+
+[[options]]
+id = "vignette"
+name = "Vignette"
+description = "Dim the outer corners slightly; off by default."
+type = "bool"
+default = false
+
+[[pages]]
+id = "main"
+name = "Sunsun Shader"
+items = ["quality", "exposure", "clouds", "shadows", "haze", "water_reflections", "ray_reflections", "weather_detail", "bloom", "page:camera"]
+
+[[pages]]
+id = "camera"
+name = "Camera"
+description = "Optional camera effects, all off by default."
+items = ["depth_of_field", "camera_motion_blur", "vignette"]
+
+[budget]
+# Medium target at 1920x1080; no hardware timing is available yet.
+gpu_ms = 4.0

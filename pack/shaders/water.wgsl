@@ -95,10 +95,10 @@ fn ss_water_color(uv: vec2<f32>) -> vec3<f32> {
     let base = vec2<i32>(floor(pixel));
     let top = min(base + vec2<i32>(1), size - vec2<i32>(1));
     let weight = fract(pixel);
-    let a = textureLoad(opaque_color, base, 0).rgb;
-    let b = textureLoad(opaque_color, vec2<i32>(top.x, base.y), 0).rgb;
-    let c = textureLoad(opaque_color, vec2<i32>(base.x, top.y), 0).rgb;
-    let d = textureLoad(opaque_color, top, 0).rgb;
+    let a = ss_decode(textureLoad(opaque_color, base, 0).rgb);
+    let b = ss_decode(textureLoad(opaque_color, vec2<i32>(top.x, base.y), 0).rgb);
+    let c = ss_decode(textureLoad(opaque_color, vec2<i32>(base.x, top.y), 0).rgb);
+    let d = ss_decode(textureLoad(opaque_color, top, 0).rgb);
     return mix(mix(a, b, weight.x), mix(c, d, weight.x), weight.y);
 }
 
@@ -163,19 +163,6 @@ fn ss_water_reflection(input: MaterialInput, normal: vec3<f32>) -> vec3<f32> {
 
     if water_reflections && quality > 0u {
         let origin = input.position + normal * 0.035;
-        if ray_reflections && quality >= 2u && frame.has_ray_tracing == 1u && frame.ray_distance > 0.05 {
-            let hit = trace(origin, direction, min(frame.ray_distance, 96.0));
-            if hit.distance >= 0.0 {
-                let tint = hit.tint.rgb / max(ss_face_shade(hit.normal), 0.12);
-                let albedo = hit.albedo.rgb * min(tint, vec3<f32>(1.35));
-                let foliage = select(0.0, 1.0, (hit.tags & 1u) != 0u);
-                let sources = block_light_color(hit.position);
-                let illumination = ss_surface_light(hit.normal, -direction, hit.light,
-                    ss_shadow(hit.position, hit.normal), sources, vec3<f32>(0.0), foliage);
-                let reflected = albedo * illumination + ss_surface_emission(albedo, hit.emission);
-                return mix(reflected, sky * open_sky, 1.0 - exp(-hit.distance * 0.0018));
-            }
-        }
         screen_hit = ss_water_ssr(origin, direction);
         if screen_hit.confidence >= 0.999 {
             return screen_hit.color;
@@ -269,5 +256,5 @@ fn sunsun_water(input: MaterialInput) -> Surface {
     let lunar = ss_water_glitter(normal, view, frame.moon_direction, roughness + 0.012)
                 * vec3<f32>(0.19, 0.26, 0.40) * ss_moonlight() * 0.12;
     let color = mix(transmission, reflected, fresnel) + min(solar + lunar, vec3<f32>(4.0)) * shadow * sky_reach;
-    return Surface(vec4<f32>(max(color, vec3<f32>(0.0)), 1.0));
+    return Surface(vec4<f32>(ss_encode(color), 1.0));
 }

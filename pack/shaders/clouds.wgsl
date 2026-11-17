@@ -115,7 +115,7 @@ fn ss_cumulus_origin(world: vec3<f32>) -> vec3<f32> {
 }
 
 fn ss_cumulus_shade(position: vec3<f32>) -> f32 {
-    let light = frame.light_direction;
+    let light = ss_light_direction();
     // At grazing sun angles the distant column is dominated by the air.
     // This continuous fade also bounds the shadow search to eight cells.
     let shadow_weight = smoothstep(0.14, 0.30, light.y);
@@ -302,7 +302,7 @@ fn ss_stratus_transmittance(position: vec3<f32>) -> f32 {
     if !clouds || quality == 0u || frame.dimension != 0 {
         return 1.0;
     }
-    let light = frame.light_direction;
+    let light = ss_light_direction();
     if abs(light.y) < 0.015 { return 1.0; }
     let world = position + frame.camera_position;
     let first = (SS_CLOUD_BASE - world.y) / light.y;

@@ -15,7 +15,7 @@ fn ss_air_amount(position: vec3<f32>) -> f32 {
         + low_layer * (0.0010 + morning * 0.0028 + (1.0 - day) * 0.0012))
         * mix(0.18, 1.0, outside) * haze;
     let physical = 1.0 - exp(-distance * density);
-    let limit = max(24.0, min(frame.render_distance, frame.fog_render.y));
+    let limit = max(24.0, frame.render_distance);
     let edge_distance = max(length(position.xz), abs(position.y));
     let edge = smoothstep(limit * 0.58, limit * 0.98, edge_distance);
     return 1.0 - (1.0 - physical) * (1.0 - edge);

@@ -1,6 +1,10 @@
 // SPDX-License-Identifier: Apache-2.0
 
-fn material(input: MaterialInput) -> Surface {
+fn material(source: MaterialInput) -> Surface {
+    var input = source;
+    input.albedo = vec4<f32>(ss_decode(source.albedo.rgb), source.albedo.a);
+    input.tint = vec4<f32>(ss_decode(source.tint.rgb), source.tint.a);
+    input.colored_light = ss_decode(source.colored_light);
     if input.fluid == 1u {
         return sunsun_water(input);
     }
@@ -16,7 +20,7 @@ fn material(input: MaterialInput) -> Surface {
         let moisture = max(frame.wetness, frame.rain * 0.55);
         wet = moisture * exposed * (1.0 - foliage * 0.70);
         albedo *= 1.0 - wet * 0.20;
-        let luma = dot(albedo, frame.luminance);
+        let luma = dot(albedo, vec3<f32>(0.2126, 0.7152, 0.0722));
         albedo = mix(albedo, vec3<f32>(luma), frame.rain * 0.10);
         // Only the camera biome is exposed by this API; coverage stays subtle.
         let cold = 1.0 - smoothstep(0.03, 0.17, frame.temperature);
@@ -25,7 +29,7 @@ fn material(input: MaterialInput) -> Surface {
         let coat = cold * upward * exposed * (0.06 + moisture * 0.30) * smoothstep(0.22, 0.70, fleck);
         albedo = mix(albedo, vec3<f32>(0.72, 0.80, 0.84), coat);
     }
-    let sources = block_light_color(input.position);
+    let sources = ss_decode_light(block_light_color(input.position));
     let visibility = ss_shadow(input.position, normal);
     let illumination = ss_surface_light(normal, view, input.light, visibility,
         sources, input.colored_light, foliage);
@@ -47,5 +51,8 @@ fn material(input: MaterialInput) -> Surface {
     if !input.translucent {
         set_surface(normal, wet * 0.65, 0.0);
     }
-    return Surface(vec4<f32>(color, input.albedo.a * input.tint.a));
+    // Before the coverage-default change, the Nightly tests returned alpha.
+    // Vertex tint alpha must not punch holes through an opaque cutout.
+    let coverage = select(input.albedo.a, input.albedo.a * input.tint.a, input.translucent);
+    return Surface(vec4<f32>(ss_encode(color), coverage));
 }

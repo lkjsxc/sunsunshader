@@ -1,16 +1,13 @@
 schema = 1
 id = "sunsunshader"
 name = "Sunsun Shader"
-version = "0.1.0"
-api = "0.2"
+version = "0.1.1"
+api = "0.1"
 description = "Warm light, cool shade and weathered air."
 authors = ["lkjsxc"]
 license = "Apache-2.0"
-shared = ["shaders/options.wgsl", "shaders/atmosphere.wgsl", "shaders/clouds.wgsl", "shaders/lighting.wgsl", "shaders/fog.wgsl"]
+shared = ["shaders/compat.wgsl", "shaders/options.wgsl", "shaders/atmosphere.wgsl", "shaders/clouds.wgsl", "shaders/lighting.wgsl", "shaders/fog.wgsl"]
 
-[frame]
-blend = "linear"
-fog = "pack"
 
 [sky]
 file = "shaders/sky.wgsl"
@@ -19,12 +16,11 @@ stars = false
 clouds = false
 
 [material]
+# The Nightly supports per-material fog control; the Air post owns terrain fog.
+fog = false
 file = "shaders/material.wgsl"
 files = ["shaders/shadows.wgsl", "shaders/water.wgsl"]
 
-[entity]
-file = "shaders/entity.wgsl"
-files = ["shaders/shadows.wgsl"]
 
 [[post]]
 file = "shaders/air.wgsl"
@@ -64,8 +60,9 @@ name = "Edge resolve"
 [weather]
 file = "shaders/weather.wgsl"
 
-[tonemap]
+[[post]]
 file = "shaders/tonemap.wgsl"
+name = "Filmic output"
 
 [[options]]
 id = "quality"
@@ -136,8 +133,6 @@ resolution = 1536
 distance = 128.0
 option = "shadows"
 
-[ray_tracing]
-# The host selects capabilities at startup; Ray reflections gates queries only.
 
 [[options]]
 id = "shadows"
@@ -153,12 +148,6 @@ description = "Reflect visible terrain in water; sky reflection remains when off
 type = "bool"
 default = true
 
-[[options]]
-id = "ray_reflections"
-name = "Ray reflections"
-description = "Use experimental ray queries on High and Ultra, with a screen-space fallback."
-type = "bool"
-default = false
 
 [[options]]
 id = "clouds"
@@ -208,7 +197,7 @@ default = false
 [[pages]]
 id = "main"
 name = "Sunsun Shader"
-items = ["quality", "exposure", "clouds", "shadows", "haze", "water_reflections", "ray_reflections", "weather_detail", "bloom", "page:camera"]
+items = ["quality", "exposure", "clouds", "shadows", "haze", "water_reflections", "weather_detail", "bloom", "page:camera"]
 
 [[pages]]
 id = "camera"

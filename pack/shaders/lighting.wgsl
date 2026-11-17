@@ -54,7 +54,7 @@ fn ss_surface_light(
             + open * (clear_sun + clear_moon + ss_sun_color() * transmitted) * visibility;
     }
     if frame.dimension == 1 {
-        let island_facing = max(dot(normal, frame.light_direction), 0.0);
+        let island_facing = max(dot(normal, ss_light_direction()), 0.0);
         illumination = vec3<f32>(0.11, 0.12, 0.20) * (0.55 + 0.45 * max(normal.y, 0.0))
             + vec3<f32>(0.42, 0.48, 0.78) * (0.25 + 0.75 * island_facing) * visibility;
     }
@@ -66,7 +66,7 @@ fn ss_surface_light(
     illumination += dynamic_light * 1.25;
     illumination += vec3<f32>(0.006, 0.009, 0.016) * (0.7 + 0.3 * frame.brightness);
     if frame.dimension == -1 {
-        illumination += frame.fog_color * 0.28 + vec3<f32>(0.06, 0.018, 0.008);
+        illumination += ss_decode(frame.fog_color) * 0.28 + vec3<f32>(0.06, 0.018, 0.008);
     }
     return mix(illumination, max(illumination, vec3<f32>(0.9)), frame.night_vision);
 }

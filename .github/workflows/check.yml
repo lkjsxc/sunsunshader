@@ -1,11 +1,11 @@
-name: Check shader pack
+name: Check released Horizon compatibility
 
 on:
   push:
     branches: [main]
-    paths: ["pack/**", ".github/workflows/check.yml"]
+    paths: ["pack/**", "pack-main/**", "tools/**", "compatibility/**", ".github/workflows/check.yml"]
   pull_request:
-    paths: ["pack/**", ".github/workflows/check.yml"]
+    paths: ["pack/**", "pack-main/**", "tools/**", "compatibility/**", ".github/workflows/check.yml"]
   workflow_dispatch:
 
 permissions:
@@ -18,35 +18,24 @@ jobs:
     env:
       CARGO_BUILD_JOBS: 2
       CARGO_INCREMENTAL: 0
-      HORIZON_REV: 5c9c56be8c14e42b8a32ac52aac53ce26e159ecc
     steps:
       - uses: actions/checkout@v4
-      - name: Get the tested Horizon revision
-        shell: bash
-        run: |
-          git init "$RUNNER_TEMP/horizon"
-          git -C "$RUNNER_TEMP/horizon" remote add origin https://github.com/horizon-rust/horizon.git
-          git -C "$RUNNER_TEMP/horizon" fetch --depth 1 origin "$HORIZON_REV"
-          git -C "$RUNNER_TEMP/horizon" checkout --detach FETCH_HEAD
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
-      - name: Cache the validator build
+      - name: Cache pinned validator builds
         uses: actions/cache@v4
         with:
           path: |
             ~/.cargo/registry
-            ${{ runner.temp }}/horizon/target
-          key: sunsun-validator-${{ runner.os }}-${{ env.HORIZON_REV }}
-      - name: Build the shader validator
-        shell: bash
-        run: |
-          cargo build --locked --profile fast \
-            --manifest-path "$RUNNER_TEMP/horizon/Cargo.toml" \
-            -p horizon-shader-api --bin horizon-shader
-      - name: Check source and installable archive
-        shell: bash
-        run: |
-          validator="$RUNNER_TEMP/horizon/target/fast/horizon-shader"
-          "$validator" check "$GITHUB_WORKSPACE/pack"
-          "$validator" pack "$GITHUB_WORKSPACE/pack" --out "$RUNNER_TEMP/sunsunshader.hshader"
-          "$validator" check "$RUNNER_TEMP/sunsunshader.hshader"
+            ~/.cargo/git
+            .build/horizon-nightly/target
+            .build/horizon-main/target
+          key: sunsun-released-validators-${{ runner.os }}-${{ hashFiles('compatibility/horizon.json') }}
+      - name: Build and check the actual archives
+        run: python3 tools/release.py check --self-test
+      - name: Keep checked archives and admission evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: checked-shader-packs
+          path: dist/*
+          if-no-files-found: error
