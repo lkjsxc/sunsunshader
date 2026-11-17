@@ -86,6 +86,13 @@ unsuitable for choosing a profile. The [cost review](https://github.com/lkjsxc/s
 retains repeat spread, feature ablations, equal-duration Medium/High/Medium
 controls and a fresh old/new forest comparison.
 
+The equal-duration forest follow-up measured **466.5 → 517.4 → 481.3 ms**
+for Medium → High → Medium, placing High 7.5–10.9% above the bracketing Medium
+measurements. A later consecutive comparison measured **553.0 ms for 0.1.1 Medium**
+and **550.2 ms for rc1 Medium** (about **1.00×**, with overlapping repeat ranges).
+These controls establish substantial run-to-run variation; the initial 1.75×
+figure is not a general overhead estimate.
+
 These are 960×540 Mesa software-renderer measurements on the same scene with eight
 worker threads, compared with 0.1.1 Medium. They are not hardware GPU benchmarks.
 The manifest's 4 ms at 1920×1080 remains a design target, not a measured result.
