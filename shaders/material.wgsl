@@ -1,6 +1,9 @@
 // SPDX-License-Identifier: Apache-2.0
 
 fn material(input: MaterialInput) -> Surface {
+    if input.fluid == 1u {
+        return sunsun_water(input);
+    }
     let normal = input.normal;
     let view = -normalize(input.position + vec3<f32>(0.0, 0.000001, 0.0));
     // Remove only the known face shade; biome colour and baked occlusion remain.
@@ -8,7 +11,7 @@ fn material(input: MaterialInput) -> Surface {
     let albedo = input.albedo.rgb * min(tint, vec3<f32>(1.35));
     let foliage = select(0.0, 1.0, (input.tags & 1u) != 0u);
     let sources = block_light_color(input.position);
-    let illumination = ss_surface_light(normal, view, input.light, vec3<f32>(1.0),
+    let illumination = ss_surface_light(normal, view, input.light, ss_shadow(input.position, normal),
         sources, input.colored_light, foliage);
     var color = albedo * illumination;
     color += ss_surface_emission(albedo, input.emission);

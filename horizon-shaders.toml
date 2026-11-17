@@ -20,9 +20,11 @@ clouds = true
 
 [material]
 file = "shaders/material.wgsl"
+files = ["shaders/shadows.wgsl", "shaders/water.wgsl"]
 
 [entity]
 file = "shaders/entity.wgsl"
+files = ["shaders/shadows.wgsl"]
 
 [[post]]
 file = "shaders/air.wgsl"
@@ -94,6 +96,27 @@ blocks = ["sea_lantern", "end_rod"]
 [[lights]]
 color = [0.81, 0.68, 1.0]
 blocks = ["pearlescent_froglight", "amethyst_cluster", "large_amethyst_bud"]
+
+[shadow]
+resolution = 1536
+distance = 128.0
+option = "shadows"
+
+[ray_tracing]
+
+[[options]]
+id = "shadows"
+name = "Shadows"
+description = "Draw filtered sun and moon shadows."
+type = "bool"
+default = true
+
+[[options]]
+id = "water_reflections"
+name = "Terrain reflections"
+description = "Reflect terrain in water using the screen or available ray queries."
+type = "bool"
+default = true
 
 [budget]
 # Medium target at 1920x1080; no hardware timing is available yet.
