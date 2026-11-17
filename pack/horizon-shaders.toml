@@ -1,7 +1,7 @@
 schema = 1
 id = "sunsunshader"
 name = "Sunsun Shader"
-version = "0.1.1"
+version = "0.2.0-rc1"
 api = "0.1"
 description = "Warm light, cool shade and weathered air."
 authors = ["lkjsxc"]
@@ -21,6 +21,9 @@ fog = false
 file = "shaders/material.wgsl"
 files = ["shaders/shadows.wgsl", "shaders/water.wgsl"]
 
+
+[vertex]
+file = "shaders/vertex.wgsl"
 
 [[post]]
 file = "shaders/air.wgsl"
@@ -67,9 +70,9 @@ name = "Filmic output"
 [[options]]
 id = "quality"
 name = "Profile"
-description = "Low, Medium, High or Ultra sampling; Medium is the default."
+description = "Low, Medium or High sampling; Medium is the default."
 type = "choice"
-values = ["Low", "Medium", "High", "Ultra"]
+values = ["Low", "Medium", "High"]
 default = "Medium"
 
 [[options]]
@@ -94,7 +97,7 @@ step = 0.1
 
 [[tags]]
 id = "foliage"
-sprites = ["block/*_leaves", "block/short_grass", "block/tall_grass_*", "block/fern", "block/large_fern_*", "block/vine"]
+sprites = ["block/*_leaves", "block/short_grass", "block/tall_grass_*", "block/fern", "block/large_fern_*", "block/vine", "block/wheat_stage*", "block/carrots_stage*", "block/potatoes_stage*", "block/beetroots_stage*"]
 
 [[tags]]
 id = "ore"
@@ -197,7 +200,7 @@ default = false
 [[pages]]
 id = "main"
 name = "Sunsun Shader"
-items = ["quality", "exposure", "clouds", "shadows", "haze", "water_reflections", "weather_detail", "bloom", "page:camera"]
+items = ["quality", "exposure", "clouds", "shadows", "haze", "water_reflections", "weather_detail", "contact_shading", "wind", "light_shafts", "bloom", "page:camera"]
 
 [[pages]]
 id = "camera"
@@ -208,3 +211,40 @@ items = ["depth_of_field", "camera_motion_blur", "vignette"]
 [budget]
 # Medium target at 1920x1080; no hardware timing is available yet.
 gpu_ms = 4.0
+
+[[materials]]
+id = 10
+sprites = ["block/*_leaves"]
+
+[[materials]]
+id = 11
+sprites = ["block/short_grass", "block/fern", "block/wheat_stage*", "block/carrots_stage*", "block/potatoes_stage*", "block/beetroots_stage*"]
+
+[[materials]]
+id = 12
+sprites = ["block/tall_grass_bottom", "block/large_fern_bottom"]
+
+[[materials]]
+id = 13
+sprites = ["block/tall_grass_top", "block/large_fern_top"]
+
+[[options]]
+id = "contact_shading"
+name = "Contact shade"
+description = "Darken nearby corners and overhangs on Medium and High."
+type = "bool"
+default = true
+
+[[options]]
+id = "wind"
+name = "Plant wind"
+description = "Gently move leaves, grass and crops together with their shadows."
+type = "bool"
+default = true
+
+[[options]]
+id = "light_shafts"
+name = "Light shafts"
+description = "On High, scatter sunlight through real shadow-map openings."
+type = "bool"
+default = true

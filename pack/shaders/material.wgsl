@@ -49,7 +49,7 @@ fn material(source: MaterialInput) -> Surface {
         color += albedo * smoothstep(0.12, 0.42, mineral) * 0.12;
     }
     if !input.translucent {
-        set_surface(normal, wet * 0.65, 0.0);
+        set_surface(normal, wet * 0.65, input.emission);
     }
     // Before the coverage-default change, the Nightly tests returned alpha.
     // Vertex tint alpha must not punch holes through an opaque cutout.

@@ -212,7 +212,7 @@ def build(target, pin, out_dir, test):
     return final
 
 
-def publish(archive, notes, title, dry_run, pin):
+def publish(archive, notes, title, dry_run, pin, prerelease=False):
     # No GitHub write is reached before this exact immutable snapshot passes.
     staging = ROOT / ".build"
     staging.mkdir(exist_ok=True)
@@ -250,6 +250,8 @@ def publish(archive, notes, title, dry_run, pin):
         command = ["gh", "release", "create", tag, snapshot, str(snapshot) + ".sha256", receipt_path,
                    "--repo", "lkjsxc/sunsunshader", "--target", commit,
                    "--title", title or f"Sunsun Shader {data['version']}", "--notes-file", notes]
+        if prerelease or "-" in data["version"]:
+            command.append("--prerelease")
         if dry_run:
             print(f"PASS release dry run: {tag}, {receipt['archive']['sha256']}; no GitHub write performed")
         else:
@@ -272,12 +274,13 @@ def main():
     release.add_argument("--notes", type=Path, required=True)
     release.add_argument("--title")
     release.add_argument("--dry-run", action="store_true")
+    release.add_argument("--prerelease", action="store_true", help="Publish as a pre-release; prerelease versions always use this flag")
     args = parser.parse_args()
     targets = pins()
     if args.command == "release":
         if not args.notes.is_file():
             raise Refused("Release notes file does not exist")
-        publish(args.archive.resolve(), args.notes.resolve(), args.title, args.dry_run, targets["nightly"])
+        publish(args.archive.resolve(), args.notes.resolve(), args.title, args.dry_run, targets["nightly"], args.prerelease)
     elif args.command == "check" and args.archive:
         if args.target == "all":
             raise Refused("Choose --target nightly or --target main when checking an existing archive")

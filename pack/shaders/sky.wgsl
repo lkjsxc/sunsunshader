@@ -28,7 +28,8 @@ fn ss_star_layer(ray: vec3<f32>, density: f32, seed: i32) -> vec3<f32> {
     let energy = min(1.0, radius * radius / (pixel * pixel));
     let temperature = ss_hash3(cell + vec3<i32>(7, 47, 0));
     let colour = mix(vec3<f32>(0.72, 0.83, 1.0), vec3<f32>(1.0, 0.82, 0.64), temperature);
-    return colour * core * energy * presence * 4.6;
+    let brightness = 0.45 + 3.8 * pow(ss_hash3(cell + vec3<i32>(53, 29, 0)), 3.0);
+    return colour * core * energy * presence * brightness;
 }
 
 fn ss_starfield(ray: vec3<f32>) -> vec3<f32> {
@@ -37,8 +38,9 @@ fn ss_starfield(ray: vec3<f32>) -> vec3<f32> {
     let band_axis = normalize(vec3<f32>(0.32, 0.78, -0.54));
     let band = exp(-pow(dot(ray, band_axis) / 0.12, 2.0));
     let dust = ss_fractal3(ray * 43.0 + vec3<f32>(4.0, 11.0, 29.0));
-    let haze = vec3<f32>(0.0035, 0.004, 0.0065) * band * (0.3 + dust);
-    let stars = ss_star_layer(ray, 230.0, 0)
+    let haze = vec3<f32>(0.007, 0.009, 0.015) * band * (0.15 + dust);
+    let stars = ss_star_layer(ray, 82.0, 61) * 0.75
+        + ss_star_layer(ray, 230.0, 0)
         + ss_star_layer(normalize(ray + vec3<f32>(0.013, 0.021, -0.008)), 415.0, 19);
     return (stars + haze) * visibility;
 }

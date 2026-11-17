@@ -5,31 +5,36 @@ fn ss_screen_direction(uv: vec2<f32>) -> vec3<f32> {
     return normalize((frame.view_inverse * vec4<f32>(point.xyz, 0.0)).xyz);
 }
 
+// Original screen-space contact integral: nearby geometry above a surface
+// normal removes part of its diffuse fill. Fixed world geometry, no frame jitter.
 fn ss_contact_occlusion(input: PostInput, position: vec3<f32>) -> f32 {
-    if quality == 0u { return 1.0; }
+    if !contact_shading || quality == 0u { return 1.0; }
     let surface = surface_at(vec2<i32>(input.uv * frame.resolution));
-    if !surface.present { return 1.0; }
-    let radius = clamp(frame.projection[1].y * frame.resolution.y * 0.65
-        / max(length(position), 1.0), 2.0, 12.0);
-    let count = select(4u, 8u, quality >= 2u);
-    var occlusion = 0.0;
+    if !surface.present || surface.data > 0.01 { return 1.0; }
+    let view_depth = max(-(frame.view * vec4<f32>(position, 1.0)).z, 0.25);
+    let pixels_per_block = frame.projection[1].y * frame.resolution.y * 0.5 / view_depth;
+    let count = select(8u, 12u, quality >= 2u);
+    var integral = 0.0;
     for (var i = 0u; i < count; i += 1u) {
-        let angle = (f32(i) + 0.37) * 6.283185307 / f32(count);
+        let angle = f32(i) * 2.39996323 + 0.41;
+        let reach = select(0.38, 1.05, (i & 1u) != 0u);
+        let radius = clamp(pixels_per_block * reach, 1.5, 28.0);
         let uv = clamp(input.uv + vec2<f32>(cos(angle), sin(angle)) * radius / frame.resolution,
             vec2<f32>(0.001), vec2<f32>(0.999));
         let depth = depth_at(uv);
         if depth > 0.000001 {
             let delta = view_position(uv, depth) - position;
             let distance = length(delta);
-            let facing = max(dot(surface.normal, delta / max(distance, 0.001)) - 0.16, 0.0);
-            occlusion += facing * (1.0 - smoothstep(0.2, 1.6, distance)) * smoothstep(0.015, 0.08, distance);
+            let elevation = max(dot(surface.normal, delta / max(distance, 0.001)) - 0.07, 0.0);
+            let range = (1.0 - smoothstep(0.35, 1.65, distance)) * smoothstep(0.025, 0.10, distance);
+            integral += elevation * range;
         }
     }
-    return 1.0 - occlusion * (0.24 / f32(count));
+    return clamp(1.0 - integral * (1.65 / f32(count)), 0.50, 1.0);
 }
 
 fn ss_air_shafts(position: vec3<f32>, pixel: vec2<f32>) -> vec3<f32> {
-    if quality == 0u || frame.dimension != 0 || frame.in_water > 0.9 { return vec3<f32>(0.0); }
+    if quality < 2u || !light_shafts || frame.dimension != 0 || frame.in_water > 0.9 { return vec3<f32>(0.0); }
     let day = ss_daylight();
     let outside = smoothstep(0.04, 0.65, frame.eye_light_smooth.y);
     if day < 0.01 || outside < 0.01 { return vec3<f32>(0.0); }
@@ -66,7 +71,12 @@ fn post(source: PostInput) -> vec4<f32> {
         return vec4<f32>(ss_camera_fog(background, background, sky_distance), 1.0);
     }
     let position = view_position(input.uv, input.depth);
-    let surface = input.color.rgb * ss_contact_occlusion(input, position);
+    let metadata = surface_at(vec2<i32>(input.uv * frame.resolution));
+    // Native API 0.1 clips radiance before post. The known terrain emitter
+    // strength survives in our metadata, allowing a restrained source-only
+    // bloom boost; ordinary surfaces and native entities are not guessed.
+    let emitter = select(0.0, clamp(metadata.data, 0.0, 1.0), metadata.present);
+    let surface = input.color.rgb * ss_contact_occlusion(input, position) * (1.0 + emitter * 2.8);
     let air = ss_fog(surface, position) + ss_air_shafts(position, input.pixel);
     let result = ss_cloud_composite(air, normalize(position), length(position));
     return vec4<f32>(result, 1.0);

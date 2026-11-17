@@ -107,8 +107,18 @@ fn ss_atmosphere(direction: vec3<f32>) -> vec3<f32> {
     // A broad diffuse term softens the horizon after multiple scattering.
     let horizon = pow(1.0 - elevation, 4.0);
     let diffuse_day = smoothstep(-0.1, 0.2, solar_height);
-    colour += vec3<f32>(0.11, 0.15, 0.19) * horizon * diffuse_day;
+    colour += vec3<f32>(0.045, 0.085, 0.16) * horizon * diffuse_day;
     colour += vec3<f32>(0.016, 0.035, 0.062) * diffuse_day;
+
+    // Clear air keeps a wavelength-dependent blue horizon. At high sun the
+    // finite-column fit is blended with a diffuse sky fit rather than a white
+    // multiple-scattering pedestal. The forward aerosol lobe stays directional.
+    let clear_day = smoothstep(0.10, 0.44, solar_height) * (1.0 - frame.rain);
+    let blue_gradient = mix(vec3<f32>(0.205, 0.405, 0.72),
+        vec3<f32>(0.026, 0.118, 0.355), pow(elevation, 0.48));
+    let aureole = ss_phase_aerosol(solar_cosine, 0.78) * 0.025
+        * ss_sun_color() * smoothstep(0.0, 0.20, solar_height);
+    colour = mix(colour, blue_gradient + aureole, clear_day * 0.82);
 
     // Long paths through the Earth's shadow retain a rose belt and violet air.
     let twilight = exp(-pow((solar_height + 0.045) / 0.16, 2.0));

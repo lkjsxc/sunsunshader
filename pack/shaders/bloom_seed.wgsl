@@ -11,7 +11,7 @@ fn post(input: PostInput) -> vec4<f32> {
             let color = textureSampleLevel(previous, linear_sampler,
                 input.uv + vec2<f32>(f32(x), f32(y)) * texel * 1.5, 0.0).rgb;
             let luma = dot(color, vec3<f32>(0.2126, 0.7152, 0.0722));
-            let knee = smoothstep(0.55, 1.3, luma);
+            let knee = smoothstep(0.72, 1.55, luma);
             sum += color * knee * weight;
             total += weight;
         }

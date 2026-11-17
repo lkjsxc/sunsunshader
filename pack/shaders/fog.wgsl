@@ -11,13 +11,13 @@ fn ss_air_amount(position: vec3<f32>) -> f32 {
     let end_height = camera_height + position.y;
     let low_layer = exp(-max((camera_height + end_height) * 0.5 - 63.0, 0.0) / 24.0);
     let outside = smoothstep(0.05, 0.75, frame.eye_light_smooth.y);
-    let density = (0.0007 + 0.0038 * frame.rain
-        + low_layer * (0.0010 + morning * 0.0028 + (1.0 - day) * 0.0012))
+    let density = (0.00022 + 0.0038 * frame.rain
+        + low_layer * (0.00024 + morning * 0.0018 + (1.0 - day) * 0.0005))
         * mix(0.18, 1.0, outside) * haze;
     let physical = 1.0 - exp(-distance * density);
     let limit = max(24.0, frame.render_distance);
     let edge_distance = max(length(position.xz), abs(position.y));
-    let edge = smoothstep(limit * 0.58, limit * 0.98, edge_distance);
+    let edge = smoothstep(limit * 0.78, limit * 0.995, edge_distance);
     return 1.0 - (1.0 - physical) * (1.0 - edge);
 }
 
