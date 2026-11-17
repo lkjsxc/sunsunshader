@@ -3,9 +3,9 @@ name: Check shader pack
 on:
   push:
     branches: [main]
-    paths: ["horizon-shaders.toml", "shaders/**", ".github/workflows/check.yml"]
+    paths: ["pack/**", ".github/workflows/check.yml"]
   pull_request:
-    paths: ["horizon-shaders.toml", "shaders/**", ".github/workflows/check.yml"]
+    paths: ["pack/**", ".github/workflows/check.yml"]
   workflow_dispatch:
 
 permissions:
@@ -47,6 +47,6 @@ jobs:
         shell: bash
         run: |
           validator="$RUNNER_TEMP/horizon/target/fast/horizon-shader"
-          "$validator" check "$GITHUB_WORKSPACE"
-          "$validator" pack "$GITHUB_WORKSPACE" --out "$RUNNER_TEMP/sunsunshader.hshader"
+          "$validator" check "$GITHUB_WORKSPACE/pack"
+          "$validator" pack "$GITHUB_WORKSPACE/pack" --out "$RUNNER_TEMP/sunsunshader.hshader"
           "$validator" check "$RUNNER_TEMP/sunsunshader.hshader"

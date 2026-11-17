@@ -14,12 +14,12 @@ Requires **Horizon shader API 0.2**. Tested with Horizon
 [`5c9c56be8c14e42b8a32ac52aac53ce26e159ecc`](https://github.com/horizon-rust/horizon/tree/5c9c56be8c14e42b8a32ac52aac53ce26e159ecc)
 for Minecraft Java Edition 26.3. The shader API is experimental.
 
-Copy this repository's folder into your game directory's `shaderpacks/`, then select **Sunsun Shader** in
+Copy the `pack/` folder to your game directory as `shaderpacks/sunsunshader/`, then select **Sunsun Shader** in
 Video Settings → Shaders → Shader Packs. Alternatively, build an installable archive with Horizon's tool:
 
 ```sh
-horizon-shader check sunsunshader
-horizon-shader pack sunsunshader --out sunsunshader-0.1.0.hshader
+horizon-shader check pack
+horizon-shader pack pack --out sunsunshader-0.1.0.hshader
 ```
 
 Put the resulting `.hshader` into `shaderpacks/`. Keep only one installed copy.
