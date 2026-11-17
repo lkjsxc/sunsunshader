@@ -58,18 +58,25 @@ fn ss_sun_disc(ray: vec3<f32>) -> vec3<f32> {
 // Beer-Lambert extinction integrated front-to-back through a finite layer;
 // phase scattering follows Henyey and Greenstein (1941), cited in atmosphere.wgsl.
 
+// A slow, repeating activity envelope varies between successive cold nights.
+fn ss_aurora_activity() -> f32 {
+    let phase = frame.time * (SS_TAU / 900.0);
+    let cycle = 0.5 + 0.5 * cos(phase - 0.45);
+    return smoothstep(0.55, 0.92, cycle);
+}
+
 fn ss_aurora(ray: vec3<f32>) -> vec3<f32> {
     if !weather_detail { return vec3<f32>(0.0); }
     let night = 1.0 - smoothstep(-0.17, -0.06, frame.sun_direction.y);
     let cold = 1.0 - smoothstep(-0.10, 0.15, frame.temperature);
     let clear = 1.0 - frame.rain;
-    let visibility = night * cold * clear * smoothstep(0.02, 0.20, ray.y)
+    let visibility = night * cold * clear * ss_aurora_activity() * smoothstep(0.02, 0.20, ray.y)
         * smoothstep(-0.15, 0.45, -ray.z);
     if visibility <= 0.001 {
         return vec3<f32>(0.0);
     }
     let angle = atan2(ray.x, -ray.z);
-    let drift = frame.time * 0.009;
+    let drift = ss_periodic_drift(vec2<f32>(0.009, 0.0)).x;
     let fold = sin(angle * 6.0 + drift) * 0.065
         + sin(angle * 13.0 - drift * 0.7) * 0.025;
     let elevation = asin(clamp(ray.y, -1.0, 1.0));

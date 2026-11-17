@@ -15,17 +15,21 @@ fn ss_water_hash(p: vec2<f32>) -> f32 {
     return fract((mixed.x + mixed.y) * (mixed.x + 0.41));
 }
 
+// Frame.time wraps hourly. Integer cycle counts keep motion continuous there.
+fn ss_water_phase(cycles: f32) -> f32 {
+    return SS_TAU * fract((frame.time / 3600.0) * cycles);
+}
+
 fn ss_water_wave_normal(input: MaterialInput) -> vec3<f32> {
     if input.face != 1u || water_waves <= 0.0 {
         return input.normal;
     }
     let world = input.position + frame.camera_position;
     let p = world.xz;
-    let t = frame.time;
-    let a = dot(p, vec2<f32>(0.71, 0.32)) + t * 0.84;
-    let b = dot(p, vec2<f32>(-0.29, 1.13)) - t * 1.02;
-    let c = dot(p, vec2<f32>(1.91, -0.83)) + t * 1.42;
-    let d = dot(p, vec2<f32>(-2.13, -1.57)) - t * 1.73;
+    let a = dot(p, vec2<f32>(0.71, 0.32)) + ss_water_phase(481.0);
+    let b = dot(p, vec2<f32>(-0.29, 1.13)) - ss_water_phase(584.0);
+    let c = dot(p, vec2<f32>(1.91, -0.83)) + ss_water_phase(814.0);
+    let d = dot(p, vec2<f32>(-2.13, -1.57)) - ss_water_phase(991.0);
     // A grazing pixel covers much more water than a downward-facing pixel.
     // Remove each wave before it becomes smaller than a pixel, avoiding
     // coherent ripple bands at the horizon without blurring the near shore.
@@ -47,7 +51,7 @@ fn ss_water_wave_normal(input: MaterialInput) -> vec3<f32> {
         let centre = vec2<f32>(0.5) + (vec2<f32>(h, ss_water_hash(cell + 71.0)) - 0.5) * 0.20;
         let delta = fract(grid) - centre;
         let r = length(delta);
-        let age = fract(t * 0.79 + h);
+        let age = fract(fract((frame.time / 3600.0) * 2844.0) + h);
         let ring = r - age * 0.40;
         let envelope = exp(-ring * ring * 240.0) * (1.0 - age) * (1.0 - smoothstep(0.30, 0.48, r));
         let ripple_filter = 1.0 - smoothstep(0.8, 2.8, footprint * 46.4);
@@ -228,8 +232,8 @@ fn sunsun_water(input: MaterialInput) -> Surface {
     if frame.eye_in != 1u && quality >= 1u && surface_depth > 0.000001 {
         let world_bed = behind + frame.camera_position;
         let path_fade = exp(-thickness * 0.15) * smoothstep(0.05, 0.55, thickness);
-        let wave_a = sin(dot(world_bed.xz, vec2<f32>(1.72, 1.13)) + frame.time * 0.77);
-        let wave_b = sin(dot(world_bed.xz, vec2<f32>(-1.21, 2.06)) - frame.time * 0.63);
+        let wave_a = sin(dot(world_bed.xz, vec2<f32>(1.72, 1.13)) + ss_water_phase(441.0));
+        let wave_b = sin(dot(world_bed.xz, vec2<f32>(-1.21, 2.06)) - ss_water_phase(361.0));
         // A restrained moving bed pattern; no claim of focused-light transport.
         let caustic = pow(max(1.0 - abs(wave_a + wave_b) * 0.75, 0.0), 8.0);
         bed *= 1.0 + caustic * path_fade * sky_reach * ss_daylight() * 0.24;

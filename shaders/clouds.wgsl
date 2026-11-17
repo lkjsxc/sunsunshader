@@ -4,21 +4,36 @@ const SS_CLOUD_BASE: f32 = 172.0;
 const SS_CLOUD_TOP: f32 = 310.0;
 const SS_CLOUD_HEIGHT: f32 = SS_CLOUD_TOP - SS_CLOUD_BASE;
 
-fn ss_cloud_density(position: vec3<f32>) -> f32 {
+fn ss_cloud_density_filtered(position: vec3<f32>, footprint: f32) -> f32 {
     let height = (position.y - SS_CLOUD_BASE) / SS_CLOUD_HEIGHT;
     let layer = smoothstep(0.0, 0.12, height) * (1.0 - smoothstep(0.57, 1.0, height));
     if layer <= 0.001 {
         return 0.0;
     }
-    let drift = vec3<f32>(frame.time * 0.0012, 0.0, frame.time * 0.00045);
-    let broad = ss_noise3(position * vec3<f32>(0.0041, 0.011, 0.0041) + drift);
+    let wind = ss_periodic_drift(vec2<f32>(0.0012, 0.00045));
+    let drift = vec3<f32>(wind.x, 0.0, wind.y);
+    // Average frequencies a long march segment cannot resolve. This removes
+    // coherent horizon contours without adding samples or screen-space grain.
+    let broad_weight = 1.0 - smoothstep(70.0, 220.0, footprint);
+    var broad = 0.5;
+    if broad_weight > 0.001 {
+        broad = mix(0.5, ss_noise3(position * vec3<f32>(0.0041, 0.011, 0.0041) + drift), broad_weight);
+    }
     let threshold = mix(0.64, 0.36, frame.rain);
     if broad < threshold - 0.21 {
         return 0.0;
     }
-    let detail = ss_noise3(position * vec3<f32>(0.013, 0.026, 0.013) + drift * 2.1);
+    let detail_weight = 1.0 - smoothstep(25.0, 85.0, footprint);
+    var detail = 0.5;
+    if detail_weight > 0.001 {
+        detail = mix(0.5, ss_noise3(position * vec3<f32>(0.013, 0.026, 0.013) + drift * 2.1), detail_weight);
+    }
     let mass = smoothstep(threshold, threshold + 0.19, broad + detail * 0.21);
     return mass * layer * 0.70;
+}
+
+fn ss_cloud_density(position: vec3<f32>) -> f32 {
+    return ss_cloud_density_filtered(position, 0.0);
 }
 
 fn ss_cloud_transmittance(position: vec3<f32>) -> f32 {
@@ -49,9 +64,9 @@ fn ss_cirrus(ray: vec3<f32>, behind: vec3<f32>, origin_world: vec3<f32>, max_dis
     let distance = (380.0 - origin_world.y) / ray.y;
     if distance <= 0.0 || distance >= max_distance { return behind; }
     let point = origin_world + ray * distance;
-    let wind = frame.time * 0.00012;
-    let stretched = vec3<f32>(point.x * 0.0008 + point.z * 0.0013 + wind,
-        point.z * 0.0044 - wind * 2.0, 4.3);
+    let wind = ss_periodic_drift(vec2<f32>(0.00012, -0.00024));
+    let stretched = vec3<f32>(point.x * 0.0008 + point.z * 0.0013 + wind.x,
+        point.z * 0.0044 + wind.y, 4.3);
     let thread = ss_noise3(stretched) * 0.7 + ss_noise3(stretched * 2.1 + vec3<f32>(11.0)) * 0.3;
     let amount = smoothstep(0.56, 0.83, thread) * 0.30
         * (1.0 - smoothstep(3000.0, 9000.0, distance)) * (1.0 - frame.rain * 0.5);
@@ -103,7 +118,7 @@ fn ss_cloud_volume(ray: vec3<f32>, behind: vec3<f32>, origin_world: vec3<f32>, m
         let stride = (finish - start) * (far_step - near_step);
         let distance = start + (finish - start) * (near_step + far_step) * 0.5;
         let point = origin_world + ray * distance;
-        let density = ss_cloud_density(point);
+        let density = ss_cloud_density_filtered(point, stride);
         if density > 0.003 {
             var shadow_mass = ss_cloud_density(point + light_direction * 28.0) * 42.0;
             if quality >= 2u {

@@ -26,7 +26,8 @@ fn material(input: MaterialInput) -> Surface {
         albedo = mix(albedo, vec3<f32>(0.72, 0.80, 0.84), coat);
     }
     let sources = block_light_color(input.position);
-    let illumination = ss_surface_light(normal, view, input.light, ss_shadow(input.position, normal),
+    let visibility = ss_shadow(input.position, normal);
+    let illumination = ss_surface_light(normal, view, input.light, visibility,
         sources, input.colored_light, foliage);
     var color = albedo * illumination;
     color += ss_surface_emission(albedo, input.emission);
@@ -37,7 +38,7 @@ fn material(input: MaterialInput) -> Surface {
         color = mix(color, reflection, min(fresnel * wet * 0.35, 0.25));
         let sparkle = ss_water_glitter(normal, view, frame.sun_direction, 0.18);
         color += min(sparkle, 0.8) * ss_sun_color() * ss_daylight()
-            * ss_shadow(input.position, normal) * wet * 0.24;
+            * visibility * wet * 0.24;
     }
     if (input.tags & 2u) != 0u {
         let mineral = max(max(albedo.r, albedo.g), albedo.b) - min(min(albedo.r, albedo.g), albedo.b);

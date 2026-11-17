@@ -12,6 +12,15 @@ fn ss_saturate(x: f32) -> f32 {
     return clamp(x, 0.0, 1.0);
 }
 
+// Frame.time wraps each hour. A closed wind path has the requested initial
+// velocity and meets itself with the same velocity at that boundary.
+fn ss_periodic_drift(velocity: vec2<f32>) -> vec2<f32> {
+    let seconds_per_radian = 3600.0 / SS_TAU;
+    let angle = frame.time / seconds_per_radian;
+    let perpendicular = vec2<f32>(-velocity.y, velocity.x);
+    return seconds_per_radian * (velocity * sin(angle) + perpendicular * (1.0 - cos(angle)));
+}
+
 fn ss_hash3(cell: vec3<i32>) -> f32 {
     let p = bitcast<vec3<u32>>(cell);
     var h = p.x * 501125321u + p.y * 1136930381u + p.z * 1720413743u;
@@ -126,7 +135,8 @@ fn ss_atmosphere(direction: vec3<f32>) -> vec3<f32> {
 fn ss_dimension_sky(direction: vec3<f32>) -> vec3<f32> {
     let ray = normalize(direction);
     if frame.dimension == -1 {
-        let ash = ss_noise3(ray * 4.0 + vec3<f32>(0.0, 0.0, frame.time * 0.0015));
+        let drift = ss_periodic_drift(vec2<f32>(0.0, 0.0015));
+        let ash = ss_noise3(ray * 4.0 + vec3<f32>(drift.x, 0.0, drift.y));
         return frame.fog_color * (0.60 + 0.20 * ash) + vec3<f32>(0.014, 0.004, 0.0015);
     }
     if frame.dimension == 1 {

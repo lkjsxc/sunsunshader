@@ -5,7 +5,8 @@
 fn ss_air_amount(position: vec3<f32>) -> f32 {
     let distance = length(position);
     let day = ss_daylight();
-    let morning = exp(-pow((frame.day_time - 0.02) * 12.0, 2.0));
+    let morning_phase = fract(frame.day_time - 0.02 + 0.5) - 0.5;
+    let morning = exp(-pow(morning_phase * 12.0, 2.0));
     let camera_height = frame.camera_position.y;
     let end_height = camera_height + position.y;
     let low_layer = exp(-max((camera_height + end_height) * 0.5 - 63.0, 0.0) / 24.0);

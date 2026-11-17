@@ -32,6 +32,11 @@ fn ss_surface_light(
         blue_fill * sky_direction * (0.12 + 0.70 * day)
         + (sun + moon + ss_sun_color() * transmitted) * visibility
     );
+    if frame.dimension == 1 {
+        let island_facing = max(dot(normal, frame.light_direction), 0.0);
+        illumination = vec3<f32>(0.11, 0.12, 0.20) * (0.55 + 0.45 * max(normal.y, 0.0))
+            + vec3<f32>(0.42, 0.48, 0.78) * (0.25 + 0.75 * island_facing) * visibility;
+    }
     // Light levels carry occlusion. Source colours only tint that surviving light.
     let block_level = clamp(light.x, 0.0, 1.0);
     let warm = vec3<f32>(1.0, 0.43, 0.15);
@@ -41,9 +46,6 @@ fn ss_surface_light(
     illumination += vec3<f32>(0.006, 0.009, 0.016) * (0.7 + 0.3 * frame.brightness);
     if frame.dimension == -1 {
         illumination += frame.fog_color * 0.28 + vec3<f32>(0.06, 0.018, 0.008);
-    }
-    if frame.dimension == 1 {
-        illumination += vec3<f32>(0.12, 0.14, 0.23) * (0.6 + 0.4 * max(normal.y, 0.0));
     }
     return mix(illumination, max(illumination, vec3<f32>(0.9)), frame.night_vision);
 }
