@@ -236,7 +236,8 @@ fn ss_water_reflection(input: MaterialInput, normal: vec3<f32>) -> vec3<f32> {
         let footprint = ss_water_footprint(input);
         let normal_cone = clamp(pixel_angle + footprint * 0.10, pixel_angle, 0.06);
         let unresolved = smoothstep(0.08, 1.8, footprint);
-        let roughness = 0.060 + frame.rain * 0.028 + unresolved * 0.045;
+        // The reflected sky integrates slopes removed from its macronormal.
+        let roughness = 0.100 + frame.rain * 0.028 + unresolved * 0.035;
         // The cloud helper expects a full angular diameter. Two times the
         // GGX slope width is a conservative filtered core, not its long tails.
         // Combine material roughness and the pixel/normal footprint in
@@ -274,11 +275,44 @@ fn ss_water_glitter(normal: vec3<f32>, view: vec3<f32>,
         / max(4.0 * ndv * ndl, 0.0001);
 }
 
+// The mesh is flat: normal-only waves cannot hide away-facing facets.
+// Fresnel and reflected radiance share one filtered macronormal whose ray
+// stays above the geometric horizon. This approximates unresolved visibility;
+// the full moving normal still drives refraction and direct solar detail.
+fn ss_water_visible_normal(input: MaterialInput, wave_normal: vec3<f32>) -> vec3<f32> {
+    if input.face != 1u || frame.eye_in == 1u || wave_normal.y <= 0.0 {
+        return wave_normal;
+    }
+    let view = -normalize(input.position);
+    if view.y <= 0.0 { return wave_normal; }
+    let horizontal = length(view.xz);
+    let axis = select(vec2<f32>(1.0, 0.0),
+        view.xz / max(horizontal, 0.000001), horizontal > 0.000001);
+    let across = vec2<f32>(-axis.y, axis.x);
+    // Height gradient: a positive component toward the eye tilts N away.
+    // Sub-cone slopes contribute roughness, not a fully resolved sky warp.
+    var slope = -wave_normal.xz / max(wave_normal.y, 0.0001) * 0.55;
+    // A smooth bound keeps the hemisphere construction valid when wave
+    // strength increases. A flat surface keeps exactly its original normal.
+    slope *= inverseSqrt(1.0 + dot(slope, slope));
+    let p = dot(slope, axis);
+    let q = dot(slope, across);
+    let root = sqrt(max(1.0 - view.y * view.y * q * q, 0.00000001));
+    let upper = 0.85 * view.y * (1.0 - q * q)
+        / max(horizontal + root, 0.00000001);
+    let positive = max(p, 0.0);
+    let visible_p = min(p, 0.0) + positive * upper
+        / max(length(vec2<f32>(upper, positive)), 0.00000001);
+    let visible_slope = axis * visible_p + across * q;
+    return normalize(vec3<f32>(-visible_slope.x, 1.0, -visible_slope.y));
+}
+
 fn sunsun_water(input: MaterialInput) -> Surface {
     let normal = ss_water_wave_normal(input);
+    let reflection_normal = ss_water_visible_normal(input, normal);
     let view = -normalize(input.position);
     let eye_distance = length(input.position);
-    let facing = clamp(dot(normal, view), 0.0, 1.0);
+    let facing = clamp(dot(reflection_normal, view), 0.0, 1.0);
     let refractive_index = select(0.75, 1.3333333, frame.eye_in == 1u);
     let transmitted_direction = refract(-view, normal, refractive_index);
     let total_reflection = dot(transmitted_direction, transmitted_direction) < 0.0001;
@@ -335,7 +369,7 @@ fn sunsun_water(input: MaterialInput) -> Surface {
         transmission = bed;
     }
 
-    let reflected = ss_water_reflection(input, normal);
+    let reflected = ss_water_reflection(input, reflection_normal);
     // Preserve the energy of filtered-out ripples in a wider stable lobe.
     let footprint = ss_water_footprint(input);
     let unresolved = smoothstep(0.08, 1.8, footprint);

@@ -42,6 +42,10 @@ fn ss_cumulus_lobe(cell: vec2<i32>, seed: vec4<f32>, index: u32) -> SSCumulusLob
     let centre = vec3<f32>((vec2<f32>(cell) + 0.5) * SS_CUMULUS_CELL, 0.0).xzy;
     let jitter = (seed.xy - vec2<f32>(0.5)) * 66.0;
     let scale = 0.44 + seed.w * 0.72;
+    // Vertical development is independent of width and lobe occupancy.
+    // The same family can be a shallow broken fragment or a rising tower.
+    let development = ss_hash3(vec3<i32>(cell, 617));
+    let vertical_scale = mix(0.42, 1.48, smoothstep(0.10, 0.92, development));
     let axis = normalize(seed.xy - vec2<f32>(0.5) + vec2<f32>(0.001, 0.0));
     var offset = vec2<f32>(0.0);
     var radius = vec3<f32>(100.0, 46.0, 81.0);
@@ -70,14 +74,16 @@ fn ss_cumulus_lobe(cell: vec2<i32>, seed: vec4<f32>, index: u32) -> SSCumulusLob
     let turned = vec2<f32>(offset.x * axis.x - offset.y * axis.y,
         offset.x * axis.y + offset.y * axis.x) * scale + jitter;
     radius *= scale * (0.78 + random * 0.42);
-    radius.y *= 0.72 + seed.y * 0.58;
+    let width_scale = mix(0.76, 1.0, smoothstep(0.08, 0.65, development));
+    radius *= vec3<f32>(width_scale, 1.0, width_scale);
+    radius.y *= (0.72 + seed.y * 0.58) * vertical_scale;
     // Keep every support inside its traversal cell, including jitter.
     radius.x = min(radius.x, 197.0 - abs(turned.x));
     radius.z = min(radius.z, 197.0 - abs(turned.y));
-    let base = ss_cumulus_base(seed);
+    let base = ss_cumulus_base(seed) + (random.y - 0.5) * 16.0;
     radius.y = min(radius.y, (SS_CUMULUS_TOP - 4.0 - base) / (1.0 + lift));
     return SSCumulusLobe(centre + vec3<f32>(turned.x, base + lift * radius.y, turned.y),
-        radius, base, 13.0);
+        radius, base, 11.0 + random.x * 9.0);
 }
 
 // Approximate spatial convolution of a parabolic lobe by one finite cone.
@@ -186,7 +192,7 @@ fn ss_cumulus_density(lobe: SSCumulusLobe, point: vec3<f32>, footprint: f32) -> 
     if fine_weight > 0.001 {
         fine = mix(0.5, ss_noise3(point * 0.112 + vec3<f32>(31.7, 11.3, 7.9)), fine_weight);
     }
-    var erosion = 0.44 - broad * 0.56 + (0.5 - fine) * 0.24;
+    var erosion = 0.49 - broad * 0.64 + (0.5 - fine) * 0.30;
     if quality >= 2u && footprint < 5.0 {
         let fringe = ss_noise3(point * 0.235 + vec3<f32>(9.1, 53.7, 2.3));
         erosion += (0.5 - fringe) * 0.10 * (1.0 - smoothstep(1.5, 5.0, footprint));
@@ -361,7 +367,10 @@ fn ss_cumulus_transport(ray: vec3<f32>, behind: vec3<f32>, origin_world: vec3<f3
                 let thin_rim = exp(-mass * 0.027) * (1.0 - exp(-mass * 0.20));
                 let source = ambient * (0.65 + 0.65 * height)
                     + (sun_colour * (0.055 + lit * 1.25) + moon_colour * (0.18 + lit * 0.82))
-                    + sun_colour * forward * thin_rim * resolved * (0.85 + dusk * 0.35)
+                    // A rim belongs to the illuminated flank, not the entire
+                    // lower silhouette of an otherwise shaded cloud.
+                    + sun_colour * forward * thin_rim * resolved
+                        * (0.15 + 0.85 * sqrt(lit)) * (0.70 + dusk * 0.25)
                     + sun_colour * dusk * (1.0 - height) * 0.045;
                 let air_mix = 1.0 - exp(-max(distance - 700.0, 0.0) / 5200.0);
                 let fade = 1.0 - smoothstep(range * 0.72, range, distance);
@@ -591,7 +600,7 @@ fn ss_stratus_volume(ray: vec3<f32>, behind: vec3<f32>, origin_world: vec3<f32>,
     let moon_colour = vec3<f32>(0.017, 0.026, 0.045) * ss_moonlight();
     let ambient = mix(vec3<f32>(0.0025, 0.005, 0.011), vec3<f32>(0.15, 0.20, 0.28), ss_daylight());
     let forward = ss_phase_aerosol(dot(ray, frame.sun_direction), 0.66);
-    let phase_light = 0.40 + min(forward, 3.0) * 1.6;
+    let phase_light = 0.30 + min(forward, 1.8) * 0.85;
     let light_direction = select(frame.moon_direction, frame.sun_direction, sunlit > 0.05);
     let dusk = (1.0 - smoothstep(0.02, 0.30, frame.sun_direction.y)) * sunlit;
     var transmission = 1.0;
