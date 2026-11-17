@@ -45,7 +45,7 @@ fn ss_surface_light(
         // Redistribute daylight toward open shade using the shadow result
         // already available. This leaves the sunlit response and caves intact.
         let shaded = 1.0 - clamp(dot(visibility, vec3<f32>(1.0 / 3.0)), 0.0, 1.0);
-        let shade_fill = 1.0 + 0.85 * high_sun * shaded;
+        let shade_fill = 1.0 + 2.10 * high_sun * shaded;
         let indirect = clear_fill * (0.12 + 0.70 * day) * shade_fill
             + vec3<f32>(0.012, 0.025, 0.050) * deep_night;
         let clear_sun = sun * (1.0 + high_sun * 0.08);
