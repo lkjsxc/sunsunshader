@@ -26,10 +26,17 @@ fn ss_water_wave_normal(input: MaterialInput) -> vec3<f32> {
     }
     let world = input.position + frame.camera_position;
     let p = world.xz;
-    let a = dot(p, vec2<f32>(0.71, 0.32)) + ss_water_phase(481.0);
-    let b = dot(p, vec2<f32>(-0.29, 1.13)) - ss_water_phase(584.0);
-    let c = dot(p, vec2<f32>(1.91, -0.83)) + ss_water_phase(814.0);
-    let d = dot(p, vec2<f32>(-2.13, -1.57)) - ss_water_phase(991.0);
+    // A broad smooth warp bends crests without adding fine noise or texture reads.
+    let warp_x = vec2<f32>(0.113, 0.071);
+    let warp_z = vec2<f32>(-0.067, 0.139);
+    let warp_phase = vec2<f32>(dot(p, warp_x) + ss_water_phase(13.0),
+                              dot(p, warp_z) - ss_water_phase(17.0));
+    let warped = p + sin(warp_phase) * 1.6;
+    let warp_gradient = cos(warp_phase) * 1.6;
+    let a = dot(warped, vec2<f32>(0.71, 0.32)) + ss_water_phase(481.0);
+    let b = dot(warped, vec2<f32>(-0.29, 1.13)) - ss_water_phase(584.0);
+    let c = dot(warped, vec2<f32>(1.91, -0.83)) + ss_water_phase(814.0);
+    let d = dot(warped, vec2<f32>(-2.13, -1.57)) - ss_water_phase(991.0);
     // A grazing pixel covers much more water than a downward-facing pixel.
     // Remove each wave before it becomes smaller than a pixel, avoiding
     // coherent ripple bands at the horizon without blurring the near shore.
@@ -38,11 +45,17 @@ fn ss_water_wave_normal(input: MaterialInput) -> vec3<f32> {
     let footprint = 2.0 * eye_distance
         / max(frame.resolution.y * abs(frame.projection[1].y) * facing, 1.0);
     let wave_filter = vec4<f32>(1.0) - smoothstep(vec4<f32>(0.8), vec4<f32>(2.8),
-        footprint * vec4<f32>(0.779, 1.167, 2.082, 2.646));
-    var slope = vec2<f32>(0.71, 0.32) * cos(a) * 0.044 * wave_filter.x
+        footprint * 1.35 * vec4<f32>(0.779, 1.167, 2.082, 2.646));
+    let wave_slope = vec2<f32>(0.71, 0.32) * cos(a) * 0.044 * wave_filter.x
               + vec2<f32>(-0.29, 1.13) * cos(b) * 0.027 * wave_filter.y
               + vec2<f32>(1.91, -0.83) * cos(c) * 0.012 * wave_filter.z
               + vec2<f32>(-2.13, -1.57) * cos(d) * 0.006 * wave_filter.w;
+    // Apply the warp Jacobian so the normal remains a height-field derivative.
+    var slope = vec2<f32>(
+        wave_slope.x * (1.0 + warp_gradient.x * warp_x.x)
+            + wave_slope.y * warp_gradient.y * warp_z.x,
+        wave_slope.x * warp_gradient.x * warp_x.y
+            + wave_slope.y * (1.0 + warp_gradient.y * warp_z.y));
 
     if frame.rain > 0.01 && frame.precipitation == 1u {
         let grid = p * 0.8;
@@ -150,7 +163,7 @@ fn ss_water_reflection(input: MaterialInput, normal: vec3<f32>) -> vec3<f32> {
 
     if water_reflections && quality > 0u {
         let origin = input.position + normal * 0.035;
-        if quality >= 2u && frame.has_ray_tracing == 1u {
+        if ray_reflections && quality >= 2u && frame.has_ray_tracing == 1u && frame.ray_distance > 0.05 {
             let hit = trace(origin, direction, min(frame.ray_distance, 96.0));
             if hit.distance >= 0.0 {
                 let tint = hit.tint.rgb / max(ss_face_shade(hit.normal), 0.12);

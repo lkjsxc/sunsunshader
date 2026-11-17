@@ -15,20 +15,28 @@ fn ss_cloud_density_filtered(position: vec3<f32>, footprint: f32) -> f32 {
     // Average frequencies a long march segment cannot resolve. This removes
     // coherent horizon contours without adding samples or screen-space grain.
     let broad_weight = 1.0 - smoothstep(70.0, 220.0, footprint);
+    let detail_weight = 1.0 - smoothstep(25.0, 85.0, footprint);
+    // Filtering the noise mean alone loses clouds below the density cutoff.
+    // Broaden that cutoff by the variance removed from both noise bands.
+    // 0.032 is a conservative mean variance for cubic lattice value noise.
+    let lost_variance = 0.032 * ((1.0 - broad_weight * broad_weight)
+        + 0.21 * 0.21 * (1.0 - detail_weight * detail_weight));
+    let transition = sqrt(0.19 * 0.19 + 4.0 * lost_variance);
     var broad = 0.5;
     if broad_weight > 0.001 {
-        broad = mix(0.5, ss_noise3(position * vec3<f32>(0.0041, 0.011, 0.0041) + drift), broad_weight);
+        broad = mix(0.5, ss_noise3(position * 0.0041 + vec3<f32>(0.0, 1.6629, 0.0) + drift), broad_weight);
     }
     let threshold = mix(0.64, 0.36, frame.rain);
-    if broad < threshold - 0.21 {
+    let lower = threshold + 0.095 - transition * 0.5;
+    let upper = threshold + 0.095 + transition * 0.5;
+    if broad + 0.21 < lower {
         return 0.0;
     }
-    let detail_weight = 1.0 - smoothstep(25.0, 85.0, footprint);
     var detail = 0.5;
     if detail_weight > 0.001 {
-        detail = mix(0.5, ss_noise3(position * vec3<f32>(0.013, 0.026, 0.013) + drift * 2.1), detail_weight);
+        detail = mix(0.5, ss_noise3(position * 0.013 + vec3<f32>(0.0, 3.133, 0.0) + drift * 2.1), detail_weight);
     }
-    let mass = smoothstep(threshold, threshold + 0.19, broad + detail * 0.21);
+    let mass = smoothstep(lower, upper, broad + detail * 0.21);
     return mass * layer * 0.70;
 }
 

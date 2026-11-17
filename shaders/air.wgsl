@@ -59,7 +59,9 @@ fn post(input: PostInput) -> vec4<f32> {
         if frame.dimension == -1 || frame.dimension == 1 {
             background = ss_dimension_sky(direction);
         }
-        return vec4<f32>(ss_cloud_composite(background, direction, 12000.0), 1.0);
+        background = ss_cloud_composite(background, direction, 12000.0);
+        let sky_distance = max(frame.far, frame.render_distance);
+        return vec4<f32>(ss_camera_fog(background, background, sky_distance), 1.0);
     }
     let position = view_position(input.uv, input.depth);
     let surface = input.color.rgb * ss_contact_occlusion(input, position);

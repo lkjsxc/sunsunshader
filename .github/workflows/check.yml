@@ -18,7 +18,7 @@ jobs:
     env:
       CARGO_BUILD_JOBS: 2
       CARGO_INCREMENTAL: 0
-      HORIZON_REV: 5cf677c51c7d1212330901f37305e928d0a0f883
+      HORIZON_REV: 5c9c56be8c14e42b8a32ac52aac53ce26e159ecc
     steps:
       - uses: actions/checkout@v4
       - name: Get the tested Horizon revision

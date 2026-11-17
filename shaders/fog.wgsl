@@ -32,7 +32,12 @@ fn ss_fog(color: vec3<f32>, position: vec3<f32>) -> vec3<f32> {
     if frame.dimension == 1 {
         amount = max(amount, 1.0 - exp(-distance * 0.0016 * haze));
     }
-    var result = mix(color, air, amount);
+    return ss_camera_fog(color, mix(color, air, amount), distance);
+}
+
+// Camera media and vision effects also cover sky rays that have no depth.
+fn ss_camera_fog(color: vec3<f32>, air_result: vec3<f32>, distance: f32) -> vec3<f32> {
+    var result = air_result;
     if frame.in_water > 0.001 {
         let transmission = exp(-distance * vec3<f32>(0.17, 0.055, 0.025));
         let water_light = 0.16 + 0.84 * ss_daylight();

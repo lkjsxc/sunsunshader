@@ -137,6 +137,7 @@ distance = 128.0
 option = "shadows"
 
 [ray_tracing]
+# The host selects capabilities at startup; Ray reflections gates queries only.
 
 [[options]]
 id = "shadows"
@@ -148,9 +149,16 @@ default = true
 [[options]]
 id = "water_reflections"
 name = "Terrain reflections"
-description = "Reflect terrain in water using the screen or available ray queries."
+description = "Reflect visible terrain in water; sky reflection remains when off."
 type = "bool"
 default = true
+
+[[options]]
+id = "ray_reflections"
+name = "Ray reflections"
+description = "Use experimental ray queries on High and Ultra, with a screen-space fallback."
+type = "bool"
+default = false
 
 [[options]]
 id = "clouds"
@@ -162,7 +170,7 @@ default = true
 [[options]]
 id = "weather_detail"
 name = "Weather detail"
-description = "Add wet surfaces, a cold snow coat, clearing-rain bows and faint auroras."
+description = "Add wet surfaces, a light snow coat, rainbows and faint auroras."
 type = "bool"
 default = true
 
@@ -200,7 +208,7 @@ default = false
 [[pages]]
 id = "main"
 name = "Sunsun Shader"
-items = ["quality", "exposure", "clouds", "shadows", "haze", "water_reflections", "weather_detail", "bloom", "page:camera"]
+items = ["quality", "exposure", "clouds", "shadows", "haze", "water_reflections", "ray_reflections", "weather_detail", "bloom", "page:camera"]
 
 [[pages]]
 id = "camera"
