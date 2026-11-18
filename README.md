@@ -6,7 +6,7 @@ An original native Horizon shader pack with warm light in the air, dark unlit
 Overworld spaces, directional shadows, clear blue daylight, layered clouds and
 reflective water.
 
-**0.2.0-rc2 is a pre-release for the ordinary public Nightly. Medium is the default.**
+**0.2.0-rc2 is the current release for the public Nightly. Medium is the default.**
 Its five-scene comparison with rc1 follows the same world, camera, clock, weather
 and settings: lantern village, torch/lava cave, rainy dusk forest, moonlit shore
 and a brilliant noon control.
