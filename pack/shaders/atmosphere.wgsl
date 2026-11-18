@@ -128,11 +128,9 @@ fn ss_atmosphere(direction: vec3<f32>) -> vec3<f32> {
         + vec3<f32>(0.022, 0.016, 0.059) * (0.3 + 0.7 * elevation));
 
     let night = 1.0 - smoothstep(-0.16, -0.015, solar_height);
-    let lunar_haze = min(ss_phase_aerosol(clamp(dot(ray, frame.moon_direction), -1.0, 1.0), 0.91) * 0.065, 1.0)
-        * ss_moonlight() * (0.65 + 0.35 * clamp(frame.downfall, 0.0, 1.0));
     let night_air = mix(vec3<f32>(0.00030, 0.00065, 0.0018),
         vec3<f32>(0.00012, 0.00030, 0.0011), pow(elevation, 0.45));
-    colour += night_air * night + vec3<f32>(0.045, 0.067, 0.10) * lunar_haze;
+    colour += night_air * night;
 
     // Storm light is broad and subdued. Reusing the bright clear-air forward
     // lobe as a grey value makes rain a white curtain at the horizon.

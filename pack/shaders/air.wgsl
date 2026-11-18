@@ -93,6 +93,7 @@ fn post(source: PostInput) -> vec4<f32> {
         if frame.dimension == -1 || frame.dimension == 1 {
             background = ss_dimension_sky(direction);
         }
+        background += ss_visible_moon_air(direction);
         background = ss_cloud_composite(background, direction, 12000.0);
         let sky_distance = max(frame.far, frame.render_distance);
         return vec4<f32>(ss_camera_fog(background, background, sky_distance)

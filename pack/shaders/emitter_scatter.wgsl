@@ -31,10 +31,11 @@ fn ss_emitter_scatter(source: vec4<f32>, ray: vec3<f32>, distance: f32, uv: vec2
     let screen_delta = abs((source_uv - uv) * frame.resolution);
     // Discovery has finite circular support. Reach zero before its last cell
     // so a source crossing that boundary does not cut a luminous rectangle.
-    let support = 1.0 - smoothstep(50.0, 82.0, length(screen_delta) / max(frame.resolution.y / 540.0, 1.0));
+    let support_radius = ss_emitter_support_radius();
+    let support = 1.0 - smoothstep(support_radius * (50.0 / 82.0), support_radius, length(screen_delta));
     let screen_edge = min(min(source_uv.x, 1.0 - source_uv.x) * frame.resolution.x,
         min(source_uv.y, 1.0 - source_uv.y) * frame.resolution.y);
-    let edge = smoothstep(1.0, 10.0, screen_edge);
+    let edge = smoothstep(1.0, 10.0, screen_edge / max(frame.resolution.y / 540.0, 1.0));
     if support * edge <= 0.0001 { return vec3<f32>(0.0); }
 
     let source_position = ss_emitter_position(source);
@@ -62,7 +63,7 @@ fn ss_emitter_scatter(source: vec4<f32>, ray: vec3<f32>, distance: f32, uv: vec2
     let texture_density = 0.84 + 0.32 * ss_noise3(world_medium * 0.24 + vec3<f32>(drift.x, 0.0, drift.y));
     let strength = ss_emitter_strength(source);
     return source_color * (integral * density * transmission * visibility * strength
-        * range_weight * support * edge * energy * texture_density * 5.0);
+        * range_weight * support * edge * energy * texture_density * 8.0);
 }
 
 fn post(input: PostInput) -> vec4<f32> {

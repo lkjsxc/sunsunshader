@@ -28,11 +28,11 @@ fn ss_surface_light(
     let direct_open = select(pow(sky_level, 2.2), smoothstep(0.015, 0.38, sky_level),
         shadows && frame.has_shadow != 0u);
     let sky_fill = mix(vec3<f32>(0.235, 0.31, 0.45), vec3<f32>(0.31, 0.34, 0.39), rain);
-    let sky = sky_fill * (0.78 * day) + vec3<f32>(0.0015, 0.0026, 0.0045) * night;
+    let sky = sky_fill * (0.78 * day);
     let bounce = vec3<f32>(0.070, 0.058, 0.040) * day * (1.0 - rain * 0.45)
         * (0.75 - 0.40 * up);
     let sunlight = ss_sun_color() * (1.72 * ndl * day * direct_weather);
-    let moonlight = vec3<f32>(0.065, 0.10, 0.16) * ndm * night;
+    let moonlight = vec3<f32>(0.040, 0.065, 0.10) * ndm * night;
     let backlit = pow(max(dot(view, -frame.sun_direction), 0.0), 3.0);
     let transmission = foliage * (0.16 + 0.52 * backlit)
         * day * direct_weather * (0.35 + 0.65 * abs(dot(normal, frame.sun_direction)));
