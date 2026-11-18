@@ -1,5 +1,7 @@
 # Sunsun Shader
 
+A native shader pack that runs on Horizon, the game client written in Rust.
+
 An original native Horizon shader pack with warm light in the air, dark unlit
 Overworld spaces, directional shadows, clear blue daylight, layered clouds and
 reflective water.
