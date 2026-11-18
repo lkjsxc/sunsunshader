@@ -10,7 +10,7 @@ fn ss_screen_direction(uv: vec2<f32>) -> vec3<f32> {
 fn ss_contact_occlusion(input: PostInput, position: vec3<f32>) -> f32 {
     if !contact_shading || quality == 0u { return 1.0; }
     let surface = surface_at(vec2<i32>(input.uv * frame.resolution));
-    if !surface.present || surface.data > 0.01 { return 1.0; }
+    if !surface.present || ss_metadata_emission(surface.data) > 0.01 { return 1.0; }
     let view_depth = max(-(frame.view * vec4<f32>(position, 1.0)).z, 0.25);
     let pixels_per_block = frame.projection[1].y * frame.resolution.y * 0.5 / view_depth;
     let count = select(8u, 12u, quality >= 2u);
@@ -58,6 +58,32 @@ fn ss_air_shafts(position: vec3<f32>, pixel: vec2<f32>) -> vec3<f32> {
     return ss_sun_color() * scattered * day * outside * 0.14 * (1.0 - 0.78 * frame.thunder);
 }
 
+// Bilateral reconstruction keeps quarter-resolution air on its own depth
+// layer. A near wall does not inherit the glow computed for a ray behind it.
+fn ss_visible_light_air(uv: vec2<f32>, distance: f32) -> vec3<f32> {
+    if !local_haze || quality == 0u || ss_local_air_density() < 0.00001 { return vec3<f32>(0.0); }
+    let dimensions = vec2<i32>(textureDimensions(ss_haze));
+    let coordinate = uv * vec2<f32>(dimensions) - vec2<f32>(0.5);
+    let base = vec2<i32>(floor(coordinate));
+    let fraction = fract(coordinate);
+    var colour = vec3<f32>(0.0);
+    var weight = 0.0;
+    for (var y = 0i; y < 2i; y += 1i) {
+        for (var x = 0i; x < 2i; x += 1i) {
+            let texel = clamp(base + vec2<i32>(x, y), vec2<i32>(0), dimensions - 1);
+            let sample = textureLoad(ss_haze, texel, 0);
+            let bilinear = select(1.0 - fraction.x, fraction.x, x == 1i)
+                * select(1.0 - fraction.y, fraction.y, y == 1i);
+            let depth_weight = 1.0 - smoothstep(0.35 + distance * 0.015,
+                1.0 + distance * 0.035, abs(sample.a - distance));
+            let w = bilinear * depth_weight;
+            colour += sample.rgb * w;
+            weight += w;
+        }
+    }
+    return colour / max(weight, 0.00001);
+}
+
 fn post(source: PostInput) -> vec4<f32> {
     var input = source;
     input.color = vec4<f32>(ss_decode(source.color.rgb), source.color.a);
@@ -69,16 +95,19 @@ fn post(source: PostInput) -> vec4<f32> {
         }
         background = ss_cloud_composite(background, direction, 12000.0);
         let sky_distance = max(frame.far, frame.render_distance);
-        return vec4<f32>(ss_camera_fog(background, background, sky_distance), 1.0);
+        return vec4<f32>(ss_camera_fog(background, background, sky_distance)
+            + ss_visible_light_air(input.uv, max(frame.render_distance, 64.0)), 1.0);
     }
     let position = view_position(input.uv, input.depth);
     let metadata = surface_at(vec2<i32>(input.uv * frame.resolution));
     // Native API 0.1 clips radiance before post. The known terrain emitter
     // strength survives in our metadata, allowing a restrained source-only
     // bloom boost; ordinary surfaces and native entities are not guessed.
-    let emitter = select(0.0, clamp(metadata.data, 0.0, 1.0), metadata.present);
+    let emitter = select(0.0, ss_metadata_emission(metadata.data), metadata.present);
     let surface = input.color.rgb * ss_contact_occlusion(input, position) * (1.0 + emitter * 1.35);
-    let air = ss_fog(surface, position) + ss_air_shafts(position, input.pixel);
-    let result = ss_cloud_composite(air, normalize(position), length(position));
+    let sky_light = select(frame.eye_light_smooth.y, ss_metadata_sky(metadata.data), metadata.present);
+    let air = ss_fog(surface, position, sky_light) + ss_air_shafts(position, input.pixel);
+    let result = ss_cloud_composite(air, normalize(position), length(position))
+        + ss_visible_light_air(input.uv, length(position));
     return vec4<f32>(result, 1.0);
 }

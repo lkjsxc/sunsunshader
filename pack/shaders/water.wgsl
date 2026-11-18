@@ -220,7 +220,7 @@ fn ss_water_ssr(origin: vec3<f32>, direction: vec3<f32>,
 
 fn ss_water_reflection(input: MaterialInput, normal: vec3<f32>) -> vec3<f32> {
     let direction = reflect(normalize(input.position), normal);
-    let open_sky = mix(0.025, 1.0, smoothstep(0.025, 0.60, input.light.y));
+    let open_sky = smoothstep(0.025, 0.60, input.light.y);
     var sky = ss_dimension_sky(direction);
     var screen_hit = SsWaterReflection(vec3<f32>(0.0), 0.0);
     if water_reflections && quality > 0u {
@@ -251,7 +251,7 @@ fn ss_water_reflection(input: MaterialInput, normal: vec3<f32>) -> vec3<f32> {
     sky *= open_sky;
     if frame.eye_in == 1u && direction.y < 0.0 {
         sky = vec3<f32>(0.004, 0.022, 0.052)
-            * (0.12 + 0.88 * ss_daylight());
+            * open_sky * (ss_daylight() + 0.018 * ss_moonlight());
     }
     return mix(sky, screen_hit.color, screen_hit.confidence);
 }
@@ -359,8 +359,8 @@ fn sunsun_water(input: MaterialInput) -> Surface {
     }
 
     let attenuation = exp(-vec3<f32>(0.205, 0.064, 0.030) * thickness);
-    let water_light = 0.010 + sky_reach
-        * (0.025 + 0.82 * ss_daylight() + 0.10 * ss_moonlight());
+    let water_light = sky_reach * (0.855 * ss_daylight() + 0.035 * ss_moonlight())
+        + 0.30 * pow(clamp(input.light.x, 0.0, 1.0), 2.35);
     let scatter = vec3<f32>(0.006, 0.066, 0.145) * water_light;
     var transmission = bed * attenuation
         + scatter * (vec3<f32>(1.0) - attenuation);

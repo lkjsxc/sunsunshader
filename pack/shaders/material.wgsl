@@ -38,15 +38,12 @@ fn material(source: MaterialInput) -> Surface {
     if wet > 0.001 && !input.translucent {
         let facing = max(dot(normal, view), 0.0);
         let fresnel = 0.025 + 0.975 * pow(1.0 - facing, 5.0);
-        let reflection = ss_dimension_sky(reflect(-view, normal));
+        let reflection = ss_dimension_sky(reflect(-view, normal))
+            * smoothstep(0.02, 0.55, input.light.y);
         color = mix(color, reflection, min(fresnel * wet * 0.35, 0.25));
         let sparkle = ss_water_glitter(normal, view, frame.sun_direction, 0.18);
         color += min(sparkle, 0.8) * ss_sun_color() * ss_daylight()
             * visibility * wet * 0.24;
-    }
-    if (input.tags & 2u) != 0u {
-        let mineral = max(max(albedo.r, albedo.g), albedo.b) - min(min(albedo.r, albedo.g), albedo.b);
-        color += albedo * smoothstep(0.12, 0.42, mineral) * 0.12;
     }
     if input.emission > 0.001 {
         // Keep source texture variation before the Nightly's bounded target.
@@ -56,7 +53,7 @@ fn material(source: MaterialInput) -> Surface {
         color *= mix(1.0, source_peak / max(peak, 0.00001), clamp(input.emission, 0.0, 1.0));
     }
     if !input.translucent {
-        set_surface(normal, wet * 0.65, input.emission);
+        set_surface(normal, wet * 0.65, ss_surface_data(input.light, input.emission, sources));
     }
     // Before the coverage-default change, the Nightly tests returned alpha.
     // Vertex tint alpha must not punch holes through an opaque cutout.

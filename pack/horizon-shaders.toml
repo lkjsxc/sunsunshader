@@ -1,7 +1,7 @@
 schema = 1
 id = "sunsunshader"
 name = "Sunsun Shader"
-version = "0.2.0-rc1"
+version = "0.2.0-rc2"
 api = "0.1"
 description = "Warm light, cool shade and weathered air."
 authors = ["lkjsxc"]
@@ -24,6 +24,33 @@ files = ["shaders/shadows.wgsl", "shaders/water.wgsl"]
 
 [vertex]
 file = "shaders/vertex.wgsl"
+
+[[post]]
+file = "shaders/emitter_seed.wgsl"
+name = "Visible light sources"
+output = "ss_bright"
+scale = 0.25
+
+[[post]]
+file = "shaders/emitter_spread_a.wgsl"
+files = ["shaders/emitter_field.wgsl"]
+name = "Light positions wide"
+output = "ss_blur"
+scale = 0.25
+
+[[post]]
+file = "shaders/emitter_spread_b.wgsl"
+files = ["shaders/emitter_field.wgsl"]
+name = "Light positions near"
+output = "ss_bloom"
+scale = 0.25
+
+[[post]]
+file = "shaders/emitter_scatter.wgsl"
+files = ["shaders/emitter_field.wgsl"]
+name = "Local light scattering"
+output = "ss_haze"
+scale = 0.25
 
 [[post]]
 file = "shaders/air.wgsl"
@@ -94,6 +121,13 @@ default = 1.0
 min = 0.5
 max = 1.8
 step = 0.1
+
+[[options]]
+id = "local_haze"
+name = "Light in the air"
+description = "Scatter visible lamps in damp or enclosed air on Medium and High."
+type = "bool"
+default = true
 
 [[tags]]
 id = "foliage"
@@ -210,7 +244,7 @@ default = false
 [[pages]]
 id = "main"
 name = "Sunsun Shader"
-items = ["quality", "exposure", "clouds", "shadows", "haze", "water_reflections", "water_waves", "weather_detail", "contact_shading", "wind", "light_shafts", "bloom", "page:camera"]
+items = ["quality", "exposure", "clouds", "shadows", "haze", "local_haze", "water_reflections", "water_waves", "weather_detail", "contact_shading", "wind", "light_shafts", "bloom", "page:camera"]
 
 [[pages]]
 id = "camera"

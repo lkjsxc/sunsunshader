@@ -3,9 +3,11 @@
 // The shoulder tends smoothly to display white instead of discarding values
 // above one. Colour is retained in shade; only bright highlights lose saturation.
 fn post(input: PostInput) -> vec4<f32> {
-    let environment = max(frame.eye_light_smooth.x * 0.65, frame.eye_light_smooth.y);
-    let adaptation = mix(1.40, 1.0, smoothstep(0.05, 0.90, environment));
-    let scene = max(input.color.rgb * exposure * adaptation, vec3<f32>(0.0));
+    // Only the player brightness control lifts faint, already lit detail.
+    // Multiplication keeps a zero-radiance room exactly black at every setting.
+    let input_luma = dot(max(input.color.rgb, vec3<f32>(0.0)), vec3<f32>(0.2126, 0.7152, 0.0722));
+    let player_gain = 1.0 + 0.25 * frame.brightness * (1.0 - smoothstep(0.002, 0.06, input_luma));
+    let scene = max(input.color.rgb * exposure * player_gain, vec3<f32>(0.0));
     let luma = dot(scene, vec3<f32>(0.2126, 0.7152, 0.0722));
     let toe = luma * (luma + 0.045) / (luma + 0.060);
     let mapped = 1.0 - exp(-toe * 1.55);

@@ -28,11 +28,11 @@ fn ss_surface_light(
     let direct_open = select(pow(sky_level, 2.2), smoothstep(0.015, 0.38, sky_level),
         shadows && frame.has_shadow != 0u);
     let sky_fill = mix(vec3<f32>(0.235, 0.31, 0.45), vec3<f32>(0.31, 0.34, 0.39), rain);
-    let sky = sky_fill * (0.78 * day) + vec3<f32>(0.034, 0.050, 0.080) * night;
+    let sky = sky_fill * (0.78 * day) + vec3<f32>(0.0015, 0.0026, 0.0045) * night;
     let bounce = vec3<f32>(0.070, 0.058, 0.040) * day * (1.0 - rain * 0.45)
         * (0.75 - 0.40 * up);
     let sunlight = ss_sun_color() * (1.72 * ndl * day * direct_weather);
-    let moonlight = vec3<f32>(0.17, 0.25, 0.40) * ndm * night;
+    let moonlight = vec3<f32>(0.065, 0.10, 0.16) * ndm * night;
     let backlit = pow(max(dot(view, -frame.sun_direction), 0.0), 3.0);
     let transmission = foliage * (0.16 + 0.52 * backlit)
         * day * direct_weather * (0.35 + 0.65 * abs(dot(normal, frame.sun_direction)));
@@ -47,7 +47,6 @@ fn ss_surface_light(
     let lamp = mix(vec3<f32>(1.0, 0.48, 0.21), source_color.rgb, clamp(source_color.a, 0.0, 1.0));
     illumination += lamp * (pow(block_level, 2.35) * 2.05);
     illumination += dynamic_light * 1.35;
-    illumination += vec3<f32>(0.004, 0.005, 0.008) * (0.7 + 0.3 * frame.brightness);
     if frame.dimension == -1 {
         illumination += ss_decode(frame.fog_color) * 0.28 + vec3<f32>(0.06, 0.018, 0.008);
     }
@@ -56,4 +55,33 @@ fn ss_surface_light(
 
 fn ss_surface_emission(albedo: vec3<f32>, amount: f32) -> vec3<f32> {
     return albedo * amount * (1.0 + 1.1 * amount);
+}
+
+// Six four-bit attributes fit exactly in an integer float. Light levels and
+// emission already have sixteen native levels; source colour remains distinct
+// from the emitter texture, so a yellow flame texel cannot make green fog.
+fn ss_surface_data(light: vec2<f32>, emission: f32, source: vec4<f32>) -> f32 {
+    let levels = vec3<u32>(round(clamp(vec3<f32>(emission, light.x, light.y), vec3<f32>(0.0), vec3<f32>(1.0)) * 15.0));
+    let lamp = mix(vec3<f32>(1.0, 0.48, 0.21), source.rgb, clamp(source.a, 0.0, 1.0));
+    let colour = vec3<u32>(round(clamp(lamp, vec3<f32>(0.0), vec3<f32>(1.0)) * 15.0));
+    return f32(levels.x | (levels.y << 4u) | (levels.z << 8u)
+        | (colour.r << 12u) | (colour.g << 16u) | (colour.b << 20u));
+}
+
+fn ss_metadata_emission(data: f32) -> f32 {
+    return f32(u32(max(data, 0.0)) & 15u) / 15.0;
+}
+
+fn ss_metadata_block(data: f32) -> f32 {
+    return f32((u32(max(data, 0.0)) >> 4u) & 15u) / 15.0;
+}
+
+fn ss_metadata_sky(data: f32) -> f32 {
+    return f32((u32(max(data, 0.0)) >> 8u) & 15u) / 15.0;
+}
+
+fn ss_metadata_source_colour(data: f32) -> vec3<f32> {
+    let value = u32(max(data, 0.0));
+    return vec3<f32>(f32((value >> 12u) & 15u), f32((value >> 16u) & 15u),
+        f32((value >> 20u) & 15u)) / 15.0;
 }
