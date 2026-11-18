@@ -32,7 +32,7 @@ fn material(source: MaterialInput) -> Surface {
     let sources = ss_decode_light(block_light_color(input.position));
     let visibility = ss_shadow(input.position, normal);
     let illumination = ss_surface_light(normal, view, input.light, visibility,
-        sources, input.colored_light, foliage);
+        sources, input.colored_light, foliage, input.emission);
     var color = albedo * illumination;
     color += ss_surface_emission(albedo, input.emission);
     if wet > 0.001 && !input.translucent {

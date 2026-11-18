@@ -1,7 +1,7 @@
 schema = 1
 id = "sunsunshader"
 name = "Sunsun Shader"
-version = "0.2.0-rc2"
+version = "0.2.0-rc3"
 api = "0.1"
 description = "Warm light, cool shade and weathered air."
 authors = ["lkjsxc"]
