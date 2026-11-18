@@ -39,23 +39,26 @@ fn ss_water_wave_normal(input: MaterialInput) -> vec3<f32> {
     let warped = p + sin(warp_phase) * 2.4;
     let warp_gradient = cos(warp_phase) * 2.4;
     let footprint = ss_water_footprint(input);
-    // Three scales, two crossing directions each. The long swell survives at
-    // a grazing angle; fine ripples disappear before they can crawl in pixels.
+    // Three broad directions break the dominant crossing-wave rhythm. Paired
+    // middle/fine bands disappear before they can crawl at a grazing angle.
     let a = vec2<f32>(0.27, 0.13);
     let b = vec2<f32>(-0.18, 0.43);
+    let g = vec2<f32>(0.23, -0.11);
     let c = vec2<f32>(0.83, 0.37);
     let d = vec2<f32>(-0.51, 1.19);
     let e = vec2<f32>(1.89, -0.93);
     let f = vec2<f32>(-2.31, -1.47);
     let broad_filter = vec2<f32>(1.0) - smoothstep(vec2<f32>(0.65),
         vec2<f32>(2.2), footprint * vec2<f32>(0.300, 0.466));
+    let third_broad_filter = 1.0 - smoothstep(0.65, 2.2, footprint * 0.255);
     let middle_filter = vec2<f32>(1.0) - smoothstep(vec2<f32>(0.65),
         vec2<f32>(2.2), footprint * vec2<f32>(0.909, 1.295));
     let fine_filter = vec2<f32>(1.0) - smoothstep(vec2<f32>(0.65),
         vec2<f32>(2.2), footprint * vec2<f32>(2.107, 2.738));
     let derivative =
-          a * cos(dot(warped, a) + ss_water_phase(173.0)) * 0.220 * broad_filter.x
-        + b * cos(dot(warped, b) - ss_water_phase(247.0)) * 0.140 * broad_filter.y
+          a * cos(dot(warped, a) + ss_water_phase(173.0)) * 0.205 * broad_filter.x
+        + b * cos(dot(warped, b) - ss_water_phase(247.0)) * 0.135 * broad_filter.y
+        + g * cos(dot(warped, g) + ss_water_phase(139.0)) * 0.116 * third_broad_filter
         + c * cos(dot(warped, c) + ss_water_phase(421.0)) * 0.100 * middle_filter.x
         + d * cos(dot(warped, d) - ss_water_phase(563.0)) * 0.068 * middle_filter.y
         + e * cos(dot(warped, e) + ss_water_phase(817.0)) * 0.014 * fine_filter.x
@@ -237,7 +240,10 @@ fn ss_water_reflection(input: MaterialInput, normal: vec3<f32>) -> vec3<f32> {
         let normal_cone = clamp(pixel_angle + footprint * 0.10, pixel_angle, 0.06);
         let unresolved = smoothstep(0.08, 1.8, footprint);
         // The reflected sky integrates slopes removed from its macronormal.
-        let roughness = 0.100 + frame.rain * 0.028 + unresolved * 0.035;
+        // Keep cloud shape in resolved water; retain the broad cone where
+        // pixel footprints cannot resolve the reflection without crawling.
+        let roughness = mix(0.060, 0.100, unresolved)
+            + frame.rain * 0.028 + unresolved * 0.035;
         // The cloud helper expects a full angular diameter. Two times the
         // GGX slope width is a conservative filtered core, not its long tails.
         // Combine material roughness and the pixel/normal footprint in

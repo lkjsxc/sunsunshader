@@ -16,12 +16,12 @@ previous releases remain available.
 
 ## Light and darkness
 
-Medium and High add distance-dependent scattering from visible torches, lanterns,
+Medium and High add distance-dependent Overworld scattering from visible torches, lanterns,
 lava and other emissive terrain. Warm light collects along the eye ray through
 damp air; depth limits its reach. Night, low sun, rain, biome humidity and enclosed
 space increase the effect. Clear open noon does not receive this local haze.
 
-Unlit surfaces have no added ambient floor, decorative ore emission or cave
+Unlit Overworld surfaces have no added ambient floor, decorative ore emission or cave
 exposure boost. The player's brightness and vision settings remain available;
 the pack's brightness adjustment multiplies existing light and preserves zero.
 A broad lunar aureole follows the visible native moon pixels, including their

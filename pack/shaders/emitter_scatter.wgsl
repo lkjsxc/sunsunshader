@@ -56,14 +56,14 @@ fn ss_emitter_scatter(source: vec4<f32>, ray: vec3<f32>, distance: f32, uv: vec2
     let visibility = ss_light_path_visibility(source_position, medium);
     let source_surface = surface_at(ss_emitter_pixel(source));
     let source_color = ss_metadata_source_colour(source_surface.data);
-    let source_picture = ss_decode(textureLoad(scene_color, ss_emitter_pixel(source), 0).rgb);
-    let energy = clamp(max(source_picture.r, max(source_picture.g, source_picture.b)), 0.12, 1.0);
+    // Emission level supplies source power. A dark decorative texel on the
+    // same emitting block must not imprint a hard brightness band in its air.
     let drift = ss_periodic_drift(vec2<f32>(0.018, 0.009));
     let world_medium = medium + frame.camera_position;
     let texture_density = 0.84 + 0.32 * ss_noise3(world_medium * 0.24 + vec3<f32>(drift.x, 0.0, drift.y));
     let strength = ss_emitter_strength(source);
     return source_color * (integral * density * transmission * visibility * strength
-        * range_weight * support * edge * energy * texture_density * 8.0);
+        * range_weight * support * edge * texture_density * 8.0);
 }
 
 fn post(input: PostInput) -> vec4<f32> {
