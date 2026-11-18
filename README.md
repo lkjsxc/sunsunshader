@@ -1,139 +1,161 @@
 # Sunsun Shader
 
-An original native Horizon shader pack with directional sun and moon shadows,
-clear blue daylight, coloured shade, layered clouds and reflective water.
+An original native Horizon shader pack with warm light in the air, dark unlit
+Overworld spaces, directional shadows, clear blue daylight, layered clouds and
+reflective water.
 
-**0.2.0-rc1 is a pre-release.** It is built for the ordinary public Nightly,
-with Medium as its default. The visual review compares nineteen fixed scenes
-against 0.1.1, including canopy light, grazing water, lit village windows and rain.
+**0.2.0-rc2 is a pre-release for the ordinary public Nightly. Medium is the default.**
+Its five-scene comparison with rc1 follows the same world, camera, clock, weather
+and settings: lantern village, torch/lava cave, rainy dusk forest, moonlit shore
+and a brilliant noon control.
 
-![Clear coastal daylight](docs/media/noon.jpg)
-![Broken sunlight on the forest floor](docs/media/forest.jpg)
-![Golden-hour sky and water](docs/media/sunset.jpg)
-![Clear shallows and reflected clouds](docs/media/shore.jpg)
-![Warm windows under a cool night sky](docs/media/night.jpg)
-![Warm torch light and contact depth](docs/media/cave.jpg)
+![Warm lantern air against a dark village sky](docs/media/night.jpg)
+![Torch and lava haze beside black cave recesses](docs/media/cave.jpg)
+![A soft lunar aureole over the shore](docs/media/moon.jpg)
+![Clear coastal daylight retained as the control](docs/media/noon.jpg)
+![Shallow water and reflected clouds](docs/media/shore.jpg)
+![Dark foreground and distant mist in a rainy forest](docs/media/forest.jpg)
 
 ## Install
 
 Tested in **Horizon Nightly 2026-11-13 · 9f42064**, the public launcher Nightly
-for Minecraft Java Edition 26.3. The release uses shader API **0.1** and does not
-require an experimental HDR environment switch.
+for Minecraft Java Edition 26.3. The release uses shader API **0.1** and needs no
+experimental HDR environment switch.
 
-Download [sunsunshader-0.2.0-rc1.hshader](https://github.com/lkjsxc/sunsunshader/releases/download/v0.2.0-rc1/sunsunshader-0.2.0-rc1.hshader),
+Download [sunsunshader-0.2.0-rc2.hshader](https://github.com/lkjsxc/sunsunshader/releases/download/v0.2.0-rc2/sunsunshader-0.2.0-rc2.hshader),
 put it in the game's `shaderpacks/` folder, and select **Sunsun Shader** under
 Options → Video Settings → Shaders → Shader Packs. Keep one installed Sunsun
 archive. Folder installation also works as `shaderpacks/sunsunshader/`.
 
-[Version 0.1.1](https://github.com/lkjsxc/sunsunshader/releases/tag/v0.1.1) remains
-available. This release candidate changes the appearance substantially and adds
-work at Medium; the measured software comparisons below explain that cost.
+[rc1](https://github.com/lkjsxc/sunsunshader/releases/tag/v0.2.0-rc1) and
+[0.1.1](https://github.com/lkjsxc/sunsunshader/releases/tag/v0.1.1) remain available.
+This candidate deliberately makes unlit Overworld areas darker.
 
-## What changed
+## Light, darkness and water
 
-- Genuine terrain, building, cutout foliage and available entity caster maps now
-  control directional light with useful contrast. Blocker separation broadens
-  the shadow edge. Coloured sky fill stays independent of the direct shadow.
-- A clearer blue atmosphere, warm sun, cool shade and continuous highlight
-  shoulders replace the broad white daytime veil. Partly covered shade keeps
-  material colour. Smoothed eye light provides modest exposure adaptation.
-- Water reflects the original sky and cloud field at Medium, with Fresnel,
-  screen-space shore hits, filtered waves at several scales, a broad sun path,
-  depth absorption, refraction and a shallow edge transition.
-- Cumulus varies in size and height, with eroded boundaries, shaded bases and
-  low-sun rims. A separate high layer has projected footprint filtering.
-- Contact shading adds depth where visible surfaces meet. Foliage backlight and
-  gentle world-anchored plant wind use the same vertices in the caster pass.
-- Varied stars and a soft band accompany moonlight; existing light sources retain
-  warm falloff, emitter colour and restrained bloom. High adds shadowed air shafts.
+- **Light in the air:** visible torches, lanterns, lava and other emitting terrain
+  seed a bounded source field. A finite camera-ray scattering integral uses real
+  source positions, emission levels, light tint and scene depth. Night, low sun,
+  rain, biome humidity and enclosed air increase the effect. Clear open noon
+  receives none of this added local haze.
+- **Dark unlit spaces:** the Overworld's ambient floor, decorative ore glow and
+  cave exposure boost are removed. Fog cannot add unoccluded blue sky to a sealed
+  room. The player's brightness multiplies existing faint light and preserves
+  zero; native night vision and obscuring status effects remain supported.
+- **Observed lunar air:** a broader aureole follows the visible native moon pixels
+  and is composed behind clouds. A faint new-moon texture does not produce the
+  new bright halo. Directional ground and analytic water moonlight still lack a
+  native phase value; they are separate approximations.
+- **Modest water refinement:** a narrower reflection cone where pixels resolve the
+  water gives nearby cloud masses a little more shape. A third broad wave
+  direction reduces the former two-direction rhythm without materially raising
+  its unwarped slope strength. Distant filtering, the bounded visible normal,
+  shore tracing, shallow refraction and highlight shoulders remain.
 
-## Profiles and cost
+Existing directional sun/moon caster maps, coloured daytime shade, contact depth,
+foliage transmission, anchored plant wind, eroded cumulus and the separate high
+cloud layer are retained. Nether and End keep their separate dimensional
+atmospheres.
 
-**Medium is the default.** All three profiles use a 1536×1536 shadow map with a
-128-block half-distance. Low reduces filter work, rather than removing real shadows.
+## Profiles and measured cost
+
+The **Light in the air** option is on by default. Medium and High use it; Low
+retains optical bloom and skips the expensive added source/lunar sampling.
+The common graph still declares four small extra passes and one extra haze
+target on Low. Turning the option off is also available on Medium/High.
 
 | Work | Low | Medium | High |
 | --- | ---: | ---: | ---: |
-| Shadow filter samples per map |4|8|12|
-| Blocker-search depth samples |0|8|12|
-| Contact-shading depth samples |0|8|12|
-| Clear-cloud traversal cap |8 cells|14 cells|22 cells|
-| Density points per intersected cloud lobe |2|3|5|
-| Reflected-cloud traversal cap |None|10 cells|16 cells|
-| Screen reflection depth steps |None|12 + up to 4 refinement|24 + up to 4 refinement|
-| Air shaft samples |Off|Off|10|
+| Shadow filter samples per map | 4 | 8 | 12 |
+| Blocker-search depth samples | 0 | 8 | 12 |
+| Contact-shading depth samples | 0 | 8 | 12 |
+| Clear-cloud traversal cap | 8 cells | 14 cells | 22 cells |
+| Density points per intersected cloud lobe | 2 | 3 | 5 |
+| Reflected-cloud traversal cap | None | 10 cells | 16 cells |
+| Screen-reflection depth steps | None | 12 + up to 4 refinement | 24 + up to 4 refinement |
+| Visible local sources per air sample | Off | Up to 2 | Up to 3 |
+| Source-path visibility depth checks, per source | Off | 2 | 4 |
+| Daylight shaft samples | Off | Off | 10 |
 
-The cloud counts are bounds with geometric early exits; clouds are procedural
-arithmetic, not texture reads. A shadow comparison lookup performs native 2×2 PCF;
-opaque and transmitting maps are sampled separately. Full runtime counts and
-measurement methodology are in the release review.
+All profiles retain a 1536×1536 shadow map with a 128-block half-distance.
+Cloud traversal counts are bounds with geometric early exits; procedural density
+work is arithmetic. One shadow comparison lookup performs native 2×2 PCF, with
+opaque and transmitting maps sampled separately.
 
-The initial sequential run recorded the following median repeat means. Each ratio
-uses the matching scene's **0.1.1 Medium** baseline: 168.9 ms at noon, 259.2 ms over
-water and 371.1 ms in the forest.
+Local-source discovery works at one quarter of each image dimension. Its first
+spread uses up to 25 field reads at 960×540 and 121 at 1920×1080; a capped search
+and matching finite fade bound larger resolutions. The final gather/evaluation
+uses up to 17 explicit reads on Medium or 27 on High per quarter-resolution
+pixel, excluding the engine's post-input wrapper. The full
+[sampling audit](https://github.com/lkjsxc/sunsunshader/releases/download/v0.2.0-rc2/sampling-costs.md)
+accounts for metadata/depth reads, all passes, quality gates and target memory.
 
-| Profile | Noon | Grazing water | Forest, 08:00 | Three-scene geometric mean |
-| --- | ---: | ---: | ---: | ---: |
-| Low | 261.1 ms · 1.55× | 263.3 ms · 1.02× | 517.0 ms · 1.39× | 1.30× |
-| **Medium** | **307.5 ms · 1.82×** | **458.5 ms · 1.77×** | **616.9 ms · 1.66×** | **1.75×** |
-| High | 292.0 ms · 1.73× | 376.1 ms · 1.45× | 424.7 ms · 1.14× | 1.42× |
+<!-- LOOK5_COSTS_BEGIN -->
+| Scene | Profile | rc1 before, ms | rc2, ms | rc1 after, ms | Change vs bracket | rc1 drift |
+| --- | --- | ---: | ---: | ---: | ---: | ---: |
+| Night village | Medium | 217.63 | 177.66 | 180.37 | −20.46 ms / −10.33% | −17.12% |
+| Night village | High | 209.87 | 215.69 | 210.35 | +5.58 ms / +2.65% | +0.23% |
+| Torch/lava cave | Medium | 180.40 | 181.27 | 182.89 | −0.37 ms / −0.20% | +1.38% |
+| Torch/lava cave | High | 147.12 | 155.49 | 169.75 | −2.54 ms / −1.60% | +15.38% |
 
-Medium took **66–82% more frame time** in these three sequential comparisons
-(74.9% by their geometric mean). This is an observed run result on a shared host.
-High measured faster than Medium in this sequence despite its greater sample
-budget; changing machine load and different sampling periods make that ordering
-unsuitable for choosing a profile. The [cost review](https://github.com/lkjsxc/sunsunshader/releases/download/v0.2.0-rc1/costs.md)
-retains repeat spread, feature ablations, equal-duration Medium/High/Medium
-controls and a fresh old/new forest comparison.
+The bracket reference is `sqrt(rc1_before × rc1_after)`. **Village Medium and
+cave High are strongly affected by baseline drift**; their negative percentages
+do not establish a speedup. Village High's observed increase is small relative
+to overlapping repeat ranges, and cave Medium's difference is unresolved within
+variation. Host variation prevents a precise causal overhead estimate.
+<!-- LOOK5_COSTS_END -->
 
-The equal-duration forest follow-up measured **466.5 → 517.4 → 481.3 ms**
-for Medium → High → Medium, placing High 7.5–10.9% above the bracketing Medium
-measurements. A later consecutive comparison measured **553.0 ms for 0.1.1 Medium**
-and **550.2 ms for rc1 Medium** (about **1.00×**, with overlapping repeat ranges).
-These controls establish substantial run-to-run variation; the initial 1.75×
-figure is not a general overhead estimate.
+These are **960×540 Mesa software-renderer elapsed frame times**, using the same
+published client and an eight-worker/CPU limit. Each row uses a separate
+**rc1 → rc2 → rc1** bracket, with three 20-second native raw-frame samples per
+block. Values are the median of the three repeat means. Both baseline sides,
+their drift and repeat ranges are retained in the
+[cost report](https://github.com/lkjsxc/sunsunshader/releases/download/v0.2.0-rc2/costs.md).
+Bracketing reduces slow drift but does not remove shared-host or order effects.
+This is a whole-pack comparison, not isolated haze cost or a hardware GPU claim.
+The manifest's 4 ms at 1920×1080 remains a design target.
 
-These are 960×540 Mesa software-renderer measurements on the same scene with eight
-worker threads, compared with 0.1.1 Medium. They are not hardware GPU benchmarks.
-The manifest's 4 ms at 1920×1080 remains a design target, not a measured result.
+Other controls cover exposure, air density, clouds, shadows, terrain reflections,
+wave strength, contact shading, plant wind, weather detail and bloom. Depth of
+field, camera motion blur and vignette are off by default.
 
-Options cover exposure, air density, clouds, shadows, terrain reflections, wave strength,
-contact shading, plant wind, weather detail and bloom. Depth of field, camera
-motion blur and vignette are off by default.
+## Review evidence and limits
 
-## Review evidence and remaining limits
+[Release and review files](https://github.com/lkjsxc/sunsunshader/releases/tag/v0.2.0-rc2)
+include the installable archive, SHA-256, ordinary-game gate receipt,
+[native paired sheet](https://github.com/lkjsxc/sunsunshader/releases/download/v0.2.0-rc2/contact.jpg),
+[review](https://github.com/lkjsxc/sunsunshader/releases/download/v0.2.0-rc2/report.md)
+and retained rounds. Each primary cell is a native 960×540 capture. The README
+photographs come from those exact pack bytes; scene pixels are not repainted or
+graded outside the pack. The promotional film is kept separate from this release.
 
-[Release and review files](https://github.com/lkjsxc/sunsunshader/releases/tag/v0.2.0-rc1)
-include the installable archive, SHA-256, public Nightly gate receipt, comparison
-sheet and report. Each comparison cell is a native 960×540 capture from the same
-world, pose, calendar time and weather. The README pictures are native captures of these exact pack bytes; the published
-download is independently rechecked and replayed. Scene pixels are not repainted
-or graded outside the pack.
-The earlier promotional film is unchanged and was not rendered or uploaded again.
+The local air field sees **visible emitting terrain only**. Offscreen and fully
+covered sources, including emitters hidden by glass, are outside that effect.
+One source survives each seed/propagation cell before the two/three-source gather;
+competition can discard a light. Screen-depth checks reduce visible obstruction
+errors but cannot recover hidden geometry or provide full local-light transport.
+Native block lighting still supplies its existing surface falloff and wall
+occlusion.
 
-**Water remains the weakest visual element:** reflected cloud masses are too soft,
-and long swells retain a regular rhythm at grazing angles. The original night and
-End views improve more modestly than daylight. Outward window glow and High's air
-shafts remain restrained. The exposure supplement demonstrates a shallow overhang,
-so it does not establish readability for every deep cave mouth.
+Water is improved modestly and remains a weakness: distant cloud reflections
+are soft, and a finite normal-wave spectrum still has a recognizable swell.
+Offscreen shore is unavailable to screen reflections; misses use the same
+procedural sky/cloud field. The native mirror has no exposed terrain mask and
+contains a different sky, so it is not used. Waves affect normals/refraction,
+not the water mesh.
 
-The public Nightly imposes several further limits:
+Further public-Nightly limits remain:
 
-- Entity materials retain native lighting. Offscreen entity casters can leave
-  the native shadow map; a pack cannot repair that culling policy.
-- Screen-space reflections cannot see offscreen shore or hidden objects. Misses
-  return coherent procedural sky/cloud radiance. The native planar mirror has
-  no exposed terrain mask and contains a different sky, so it is not used as
-  an inaccurate fallback. Waves change normals and refraction, not the water mesh.
-- Its world frame stores bounded gamma colour. Source and final shoulders retain
-  colour but cannot restore a true HDR world buffer. Native transparent draws
+- Entity materials retain native lighting; offscreen entity casters can leave
+  the native shadow map.
+- The world buffer is bounded gamma colour. Highlight shoulders preserve
+  gradation but cannot restore HDR radiance, and native transparent surfaces
   still blend in gamma space.
-- The moon retains the game's phase texture with a halo. API 0.1 exposes neither
-  a moon-off control nor its phase value. General ray queries, local-light
-  shadow maps and arbitrary bounce-light transport are unavailable.
-- Contact shading sees visible solid terrain. Plant and cloud motion have no
-  object-motion guide; the pack uses spatial edge filtering, without temporal
-  accumulation. Snow and auroras use the camera biome.
+- The moon keeps its native phase texture. Only the added sky aureole estimates
+  phase from visible pixels; surface and water lunar light remain phase-agnostic.
+- Contact shade sees visible solid terrain. Motion uses spatial filtering,
+  without temporal accumulation or object-motion guides. Native precipitation
+  ordering, and camera-biome snow/auroras, remain limitations.
 
 ## Build and check
 
@@ -144,27 +166,27 @@ python3 tools/release.py check --self-test
 python3 tools/release.py build
 ```
 
-Both commands validate the separately pinned Nightly and API 0.2 development
-variants through their unmodified Horizon validators. `--target nightly` builds
-this 0.2.0-rc1 release; the separate `pack-main/` remains the 0.1.1 development visual
-baseline and is not the public Nightly download. Outputs go to `dist/`.
+Both commands validate the pinned Nightly and API 0.2 development variants
+through unmodified Horizon validators. `--target nightly` builds this 0.2.0-rc2
+release. The separate `pack-main/` remains the 0.1.1 development visual baseline;
+it is not the public Nightly download.
 
-The ordinary-game admission check matters: this Nightly's standalone parser
-accepts experimental features the ordinary game refuses. CI includes negative
-refusal tests as well as the exact packed-file check. The permanent Nightly
-source tag is `nightly-source/2026-11-13-9f42064`; revision, distribution digest
-and source-policy digest are pinned in [compatibility/horizon.json](compatibility/horizon.json).
+The ordinary-game admission check matters: the standalone Nightly parser accepts
+experimental features the ordinary game refuses. CI includes negative refusal
+tests and exact packed-file checks. The permanent source tag is
+`nightly-source/2026-11-13-9f42064`; distribution/source policy identities are
+pinned in [compatibility/horizon.json](compatibility/horizon.json).
 
 After validating and reviewing the final bytes, publish with:
 
 ```sh
-python3 tools/release.py release dist/sunsunshader-0.2.0-rc1.hshader --notes release-notes.md --prerelease
+python3 tools/release.py release dist/sunsunshader-0.2.0-rc2.hshader --notes release-notes.md --prerelease
 ```
 
 Publication rechecks those bytes, rebuilds for byte identity, and refuses a dirty
-checkout, an unpushed source commit or a mismatching tag. Release-candidate versions
-are always marked as pre-releases. See [tools/README.md](tools/README.md) for source
-cache controls and updating the public Nightly pin.
+checkout, an unpushed source commit or a mismatching tag. Release candidates are
+always pre-releases. See [tools/README.md](tools/README.md) for the gate and pin
+maintenance.
 
-All shader code is original and licensed under Apache-2.0. Published mathematical
-methods are credited in source comments. No other shader pack is used as source.
+All shader code is original and Apache-2.0 licensed. Published mathematical
+methods are credited in source comments; no other shader pack is used as source.
