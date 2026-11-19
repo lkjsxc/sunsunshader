@@ -1,13 +1,45 @@
 schema = 1
 id = "sunsunshader"
 name = "Sunsun Shader"
-version = "0.2.0-rc3"
-api = "0.1"
+version = "0.2.0-rc4"
+api = "0.2"
 description = "Warm light, cool shade and weathered air."
 authors = ["lkjsxc"]
 license = "Apache-2.0"
 shared = ["shaders/compat.wgsl", "shaders/options.wgsl", "shaders/atmosphere.wgsl", "shaders/clouds.wgsl", "shaders/lighting.wgsl", "shaders/fog.wgsl"]
 
+
+# Preserve rc3 transparent blending; API 0.2 stages still read/write linear light.
+[frame]
+blend = "gamma"
+primaries = "bt709"
+fog = "pack"
+
+# Source coordinates, emission codes and bilateral depth require all four channels.
+# These resources are overwritten before each read; no previous-frame values are used.
+[[resource]]
+name = "ss_bright"
+format = "rgba16float"
+scale = 0.25
+keep = "view"
+
+[[resource]]
+name = "ss_blur"
+format = "rgba16float"
+scale = 0.25
+keep = "view"
+
+[[resource]]
+name = "ss_bloom"
+format = "rgba16float"
+scale = 0.25
+keep = "view"
+
+[[resource]]
+name = "ss_haze"
+format = "rgba16float"
+scale = 0.25
+keep = "view"
 
 [sky]
 file = "shaders/sky.wgsl"
@@ -16,8 +48,6 @@ stars = false
 clouds = false
 
 [material]
-# The Nightly supports per-material fog control; the Air post owns terrain fog.
-fog = false
 file = "shaders/material.wgsl"
 files = ["shaders/shadows.wgsl", "shaders/water.wgsl"]
 
@@ -29,31 +59,31 @@ file = "shaders/vertex.wgsl"
 file = "shaders/emitter_seed.wgsl"
 name = "Visible light sources"
 output = "ss_bright"
-scale = 0.25
 
 [[post]]
 file = "shaders/emitter_spread_a.wgsl"
+reads = ["ss_bright"]
 files = ["shaders/emitter_field.wgsl"]
 name = "Light positions wide"
 output = "ss_blur"
-scale = 0.25
 
 [[post]]
 file = "shaders/emitter_spread_b.wgsl"
+reads = ["ss_blur"]
 files = ["shaders/emitter_field.wgsl"]
 name = "Light positions near"
 output = "ss_bloom"
-scale = 0.25
 
 [[post]]
 file = "shaders/emitter_scatter.wgsl"
+reads = ["ss_bloom"]
 files = ["shaders/emitter_field.wgsl"]
 name = "Local light scattering"
 output = "ss_haze"
-scale = 0.25
 
 [[post]]
 file = "shaders/air.wgsl"
+reads = ["ss_haze"]
 files = ["shaders/shadows.wgsl", "shaders/lunar_air.wgsl"]
 name = "Air"
 
@@ -61,22 +91,22 @@ name = "Air"
 file = "shaders/bloom_seed.wgsl"
 name = "Bloom seed"
 output = "ss_bright"
-scale = 0.25
 
 [[post]]
 file = "shaders/bloom_horizontal.wgsl"
+reads = ["ss_bright"]
 name = "Bloom horizontal"
 output = "ss_blur"
-scale = 0.25
 
 [[post]]
 file = "shaders/bloom_vertical.wgsl"
+reads = ["ss_blur"]
 name = "Bloom vertical"
 output = "ss_bloom"
-scale = 0.25
 
 [[post]]
 file = "shaders/compose.wgsl"
+reads = ["ss_bloom"]
 name = "Bloom and camera motion"
 
 [[post]]
@@ -93,6 +123,11 @@ file = "shaders/weather.wgsl"
 [[post]]
 file = "shaders/tonemap.wgsl"
 name = "Filmic output"
+
+# The existing curve stays the last post, retaining its window-resolution sampling.
+# Display mapping is identity; Horizon performs output encoding exactly once.
+[tonemap]
+file = "shaders/display.wgsl"
 
 [[options]]
 id = "quality"
@@ -136,6 +171,11 @@ sprites = ["block/*_leaves", "block/short_grass", "block/tall_grass_*", "block/f
 [[tags]]
 id = "ore"
 sprites = ["block/*_ore"]
+
+# Tag mask 4u (index 2): the old renderer excluded this sprite from shader emission.
+[[tags]]
+id = "rc3_non_emitting_lichen"
+sprites = ["block/glow_lichen"]
 
 [[lights]]
 color = [1.0, 0.64, 0.32]

@@ -109,5 +109,5 @@ fn sky(input: SkyInput) -> vec4<f32> {
     let ray = normalize(input.direction);
     let colour = ss_atmosphere(ray) + ss_starfield(ray) + ss_sun_disc(ray) + ss_aurora(ray) + ss_rainbow(ray);
     // Horizon retains its moon, including the game's phase texture.
-    return vec4<f32>(ss_encode(colour), 1.0);
+    return vec4<f32>(ss_world_bound(colour), 1.0);
 }

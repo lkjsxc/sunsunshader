@@ -21,5 +21,5 @@ fn post(input: PostInput) -> vec4<f32> {
     let over = max(peak - 0.78, 0.0);
     let peak_mapped = min(peak, 0.78) + 0.22 * (1.0 - exp(-over / 0.22));
     color *= peak_mapped / max(peak, 0.00001);
-    return vec4<f32>(ss_encode(color), 1.0);
+    return vec4<f32>(ss_world_bound(color), 1.0);
 }

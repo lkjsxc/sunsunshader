@@ -1,8 +1,6 @@
 // Copyright 2026 Sunsun Shader contributors. SPDX-License-Identifier: Apache-2.0
-fn weather(source: WeatherInput) -> vec4<f32> {
-    var input = source;
-    // API 0.1 supplies unlit gamma texture colour and a separate column light.
-    input.color = vec4<f32>(ss_decode(source.color.rgb), source.color.a);
+fn weather(input: WeatherInput) -> vec4<f32> {
+    // API 0.2 supplies linear texture colour and separate column light.
     let day = ss_daylight();
     let sky = pow(clamp(input.light.y, 0.0, 1.0), 2.0);
     let block = pow(clamp(input.light.x, 0.0, 1.0), 2.0);
@@ -22,5 +20,5 @@ fn weather(source: WeatherInput) -> vec4<f32> {
         color = input.color.rgb * (cool * 1.5 + warm);
         opacity = input.color.a * 0.90;
     }
-    return vec4<f32>(ss_encode(ss_fog(color, input.position, input.light.y)), opacity);
+    return vec4<f32>(ss_world_bound(ss_fog(color, input.position, input.light.y)), opacity);
 }

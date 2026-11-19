@@ -19,7 +19,7 @@ fn post(input: PostInput) -> vec4<f32> {
             let emission = clamp(ss_metadata_emission(surface.data), 0.0, 1.0);
             let level = u32(round(emission * 15.0));
             if level == 0u { continue; }
-            let source_color = ss_decode(textureLoad(scene_color, pixel, 0).rgb);
+            let source_color = textureLoad(scene_color, pixel, 0).rgb;
             let rank = emission * max(source_color.r, max(source_color.g, source_color.b));
             let delta = vec2<f32>(f32(x) - 1.5, f32(y) - 1.5);
             let center = dot(delta, delta);

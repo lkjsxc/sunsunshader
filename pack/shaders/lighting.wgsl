@@ -98,7 +98,7 @@ fn ss_surface_light(
         illumination += dynamic_light * 1.35;
     }
     if frame.dimension == -1 {
-        illumination += ss_decode(frame.fog_color) * 0.28 + vec3<f32>(0.06, 0.018, 0.008);
+        illumination += frame.fog_color * 0.28 + vec3<f32>(0.06, 0.018, 0.008);
     }
     return mix(illumination, max(illumination, vec3<f32>(0.9)), frame.night_vision);
 }

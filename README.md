@@ -1,15 +1,20 @@
 # Sunsun Shader
 
-A native shader pack that runs on Horizon, the game client written in Rust.
+Sunsun Shader is a native shader pack for Horizon, the Minecraft client written in Rust. It provides warm light in the air, dark unlit Overworld spaces, directional shadows, clear blue daylight, layered clouds, and reflective water.
 
-An original native Horizon shader pack with warm light in the air, dark unlit
-Overworld spaces, directional shadows, clear blue daylight, layered clouds and
-reflective water.
+Compatibility: [0.2.0-rc4](https://github.com/lkjsxc/sunsunshader/releases/tag/v0.2.0-rc4) is a pre-release for Horizon Nightly 2026-11-18 · dd67b76 (shader API 0.2), where older API 0.1 packs no longer load. Medium is the default profile. On Horizon Nightly 2026-11-13 · 9f42064, use [0.2.0-rc2](https://github.com/lkjsxc/sunsunshader/releases/tag/v0.2.0-rc2), which remains the GitHub Latest release.
 
-**0.2.0-rc2 is the current release for the public Nightly. Medium is the default.**
-Its five-scene comparison with rc1 follows the same world, camera, clock, weather
-and settings: lantern village, torch/lava cave, rainy dusk forest, moonlit shore
-and a brilliant noon control.
+The pictures below were taken with rc2 and rc3 on the previous Nightly. rc4 retains the same look.
+
+## Install
+
+Download [sunsunshader-0.2.0-rc4.hshader](https://github.com/lkjsxc/sunsunshader/releases/download/v0.2.0-rc4/sunsunshader-0.2.0-rc4.hshader) (SHA-256: 6768644d5b428ca34bb104a1c15ceb5db077ffe633a29d5fe981e4a045825371).
+
+Put it in the game's shaderpacks/ folder and keep only one Sunsun archive there. Folder installation also works as shaderpacks/sunsunshader/.
+
+Select Sunsun Shader under Options → Video Settings → Shaders → Shader Packs.
+
+No experimental settings are needed. Lamp haze can still flicker while walking, as in rc3.
 
 ![Warm lantern air against a dark village sky](docs/media/night.jpg)
 ![Torch and lava haze beside black cave recesses](docs/media/cave.jpg)
@@ -17,21 +22,6 @@ and a brilliant noon control.
 ![Clear coastal daylight retained as the control](docs/media/noon.jpg)
 ![Shallow water and reflected clouds](docs/media/shore.jpg)
 ![Dark foreground and distant mist in a rainy forest](docs/media/forest.jpg)
-
-## Install
-
-Tested in **Horizon Nightly 2026-11-13 · 9f42064**, the public launcher Nightly
-for Minecraft Java Edition 26.3. The release uses shader API **0.1** and needs no
-experimental HDR environment switch.
-
-Download [sunsunshader-0.2.0-rc2.hshader](https://github.com/lkjsxc/sunsunshader/releases/download/v0.2.0-rc2/sunsunshader-0.2.0-rc2.hshader),
-put it in the game's `shaderpacks/` folder, and select **Sunsun Shader** under
-Options → Video Settings → Shaders → Shader Packs. Keep one installed Sunsun
-archive. Folder installation also works as `shaderpacks/sunsunshader/`.
-
-[rc1](https://github.com/lkjsxc/sunsunshader/releases/tag/v0.2.0-rc1) and
-[0.1.1](https://github.com/lkjsxc/sunsunshader/releases/tag/v0.1.1) remain available.
-This candidate deliberately makes unlit Overworld areas darker.
 
 ## Light, darkness and water
 

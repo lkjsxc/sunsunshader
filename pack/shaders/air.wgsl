@@ -84,9 +84,7 @@ fn ss_visible_light_air(uv: vec2<f32>, distance: f32) -> vec3<f32> {
     return colour / max(weight, 0.00001);
 }
 
-fn post(source: PostInput) -> vec4<f32> {
-    var input = source;
-    input.color = vec4<f32>(ss_decode(source.color.rgb), source.color.a);
+fn post(input: PostInput) -> vec4<f32> {
     if input.depth <= 0.0000001 {
         let direction = ss_screen_direction(input.uv);
         var background = input.color.rgb;
@@ -101,9 +99,9 @@ fn post(source: PostInput) -> vec4<f32> {
     }
     let position = view_position(input.uv, input.depth);
     let metadata = surface_at(vec2<i32>(input.uv * frame.resolution));
-    // Native API 0.1 clips radiance before post. The known terrain emitter
-    // strength survives in our metadata, allowing a restrained source-only
-    // bloom boost; ordinary surfaces and native entities are not guessed.
+    // Retain rc3's emitter-only bloom compensation with its bounded world range.
+    // API 0.2 can carry more radiance, but expanding that range is a later look change.
+    // Ordinary surfaces and native entities are not guessed.
     let emitter = select(0.0, ss_metadata_emission(metadata.data), metadata.present);
     let surface = input.color.rgb * ss_contact_occlusion(input, position) * (1.0 + emitter * 1.35);
     let sky_light = select(frame.eye_light_smooth.y, ss_metadata_sky(metadata.data), metadata.present);

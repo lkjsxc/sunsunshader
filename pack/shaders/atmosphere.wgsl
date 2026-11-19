@@ -148,7 +148,7 @@ fn ss_dimension_sky(direction: vec3<f32>) -> vec3<f32> {
     if frame.dimension == -1 {
         let drift = ss_periodic_drift(vec2<f32>(0.0, 0.0015));
         let ash = ss_noise3(ray * 4.0 + vec3<f32>(drift.x, 0.0, drift.y));
-        return ss_decode(frame.fog_color) * (0.60 + 0.20 * ash) + vec3<f32>(0.014, 0.004, 0.0015);
+        return frame.fog_color * (0.60 + 0.20 * ash) + vec3<f32>(0.014, 0.004, 0.0015);
     }
     if frame.dimension == 1 {
         let ribbon = exp(-pow((ray.y + 0.22 * ray.x - 0.08) / 0.22, 2.0));

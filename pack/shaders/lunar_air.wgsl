@@ -69,8 +69,8 @@ fn ss_visible_moon_air(direction: vec3<f32>) -> vec3<f32> {
             // Only visible sky qualifies. A lamp or bright roof covering the
             // projected lunar body must not become its apparent illumination.
             if textureLoad(scene_depth, pixel, 0) > 0.0000001 { continue; }
-            let observed = ss_decode(textureSampleLevel(scene_color,
-                linear_sampler, projected.xy, 0.0).rgb);
+            let observed = textureSampleLevel(scene_color,
+                linear_sampler, projected.xy, 0.0).rgb;
             let residual = max(observed - background, vec3<f32>(0.0));
             let luminance = dot(residual, vec3<f32>(0.2126, 0.7152, 0.0722));
             // Native new moon remains below this linear-light threshold.

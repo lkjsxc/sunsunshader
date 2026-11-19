@@ -98,7 +98,7 @@ fn ss_shadow(position: vec3<f32>, normal: vec3<f32>) -> vec3<f32> {
     clear_visibility /= f32(count);
 
     let pixel = clamp(vec2<i32>(p.xy * side), vec2<i32>(0), vec2<i32>(i32(side) - 1));
-    let filter_color = ss_decode_light(textureLoad(shadow_color, pixel, 0));
+    let filter_color = textureLoad(shadow_color, pixel, 0);
     var transmission = mix(vec3<f32>(1.0), clamp(filter_color.rgb, vec3<f32>(0.02), vec3<f32>(1.0)),
                            min(filter_color.a, 0.9));
     if filter_color.a > 0.995 {

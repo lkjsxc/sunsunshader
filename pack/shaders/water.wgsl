@@ -129,8 +129,8 @@ fn ss_water_eye_depth(uv: vec2<f32>, depth: f32) -> f32 {
     return abs(view.z) / max(abs(view.w), 0.000001);
 }
 
-// The ordinary Nightly exposes unfilterable opaque colour; interpolate four
-// decoded texels so reflected and refracted banks do not jump between pixels.
+// Interpolate four linear opaque-colour texels, preserving rc3's sampling order,
+// so reflected and refracted banks do not jump between pixels.
 fn ss_water_color(uv: vec2<f32>) -> vec3<f32> {
     let size = vec2<i32>(textureDimensions(opaque_color));
     let pixel = clamp(uv * vec2<f32>(size) - 0.5,
@@ -138,10 +138,10 @@ fn ss_water_color(uv: vec2<f32>) -> vec3<f32> {
     let base = vec2<i32>(floor(pixel));
     let top = min(base + vec2<i32>(1), size - vec2<i32>(1));
     let weight = fract(pixel);
-    let a = ss_decode(textureLoad(opaque_color, base, 0).rgb);
-    let b = ss_decode(textureLoad(opaque_color, vec2<i32>(top.x, base.y), 0).rgb);
-    let c = ss_decode(textureLoad(opaque_color, vec2<i32>(base.x, top.y), 0).rgb);
-    let d = ss_decode(textureLoad(opaque_color, top, 0).rgb);
+    let a = textureLoad(opaque_color, base, 0).rgb;
+    let b = textureLoad(opaque_color, vec2<i32>(top.x, base.y), 0).rgb;
+    let c = textureLoad(opaque_color, vec2<i32>(base.x, top.y), 0).rgb;
+    let d = textureLoad(opaque_color, top, 0).rgb;
     return mix(mix(a, b, weight.x), mix(c, d, weight.x), weight.y);
 }
 
@@ -393,11 +393,11 @@ fn sunsun_water(input: MaterialInput) -> Surface {
     let reflection_amount = select(fresnel * shore, fresnel, frame.eye_in == 1u);
     let base = mix(transmission, reflected, reflection_amount);
     let direct = (solar + lunar) * shadow * direct_open * shore;
-    // Ordinary Nightly stores the world in a bounded colour target. Compress
-    // direct sparkle continuously into its remaining headroom before encoding,
+    // Retain rc3's bounded sparkle shoulder for the compatibility baseline.
+    // Compress direct sparkle continuously into its remaining headroom,
     // so a large GGX peak keeps gradation instead of becoming a solid oval.
     let headroom = max(1.0 - max(base.x, max(base.y, base.z)), 0.0);
     let direct_peak = max(direct.x, max(direct.y, direct.z));
     let color = base + direct * (headroom / max(headroom + direct_peak, 0.000001));
-    return Surface(vec4<f32>(ss_encode(max(color, vec3<f32>(0.0))), 1.0));
+    return Surface(vec4<f32>(ss_world_bound(max(color, vec3<f32>(0.0))), 1.0));
 }
