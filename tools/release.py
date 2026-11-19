@@ -1,5 +1,8 @@
 #!/usr/bin/env python3
-"""Build and admit the exact archive using pinned, unmodified Horizon sources."""
+"""Build and admit the exact archive using pinned, unmodified Horizon sources.
+
+Use --latest for the build that works with the current public Horizon Nightly.
+"""
 
 from __future__ import annotations
 
@@ -212,7 +215,7 @@ def build(target, pin, out_dir, test):
     return final
 
 
-def publish(archive, notes, title, dry_run, pin, prerelease=False):
+def publish(archive, notes, title, dry_run, pin, prerelease=False, latest=False):
     # No GitHub write is reached before this exact immutable snapshot passes.
     staging = ROOT / ".build"
     staging.mkdir(exist_ok=True)
@@ -250,7 +253,9 @@ def publish(archive, notes, title, dry_run, pin, prerelease=False):
         command = ["gh", "release", "create", tag, snapshot, str(snapshot) + ".sha256", receipt_path,
                    "--repo", "lkjsxc/sunsunshader", "--target", commit,
                    "--title", title or f"Sunsun Shader {data['version']}", "--notes-file", notes]
-        if prerelease or "-" in data["version"]:
+        if latest:
+            command.append("--latest")
+        elif prerelease or "-" in data["version"]:
             command.append("--prerelease")
         if dry_run:
             print(f"PASS release dry run: {tag}, {receipt['archive']['sha256']}; no GitHub write performed")
@@ -274,13 +279,17 @@ def main():
     release.add_argument("--notes", type=Path, required=True)
     release.add_argument("--title")
     release.add_argument("--dry-run", action="store_true")
-    release.add_argument("--prerelease", action="store_true", help="Publish as a pre-release; prerelease versions always use this flag")
+    release_kind = release.add_mutually_exclusive_group()
+    release_kind.add_argument("--prerelease", action="store_true", help="Publish as a pre-release")
+    release_kind.add_argument("--latest", action="store_true",
+                              help="Publish the build for the current public Nightly as GitHub Latest, even for an -rc version")
     args = parser.parse_args()
     targets = pins()
     if args.command == "release":
         if not args.notes.is_file():
             raise Refused("Release notes file does not exist")
-        publish(args.archive.resolve(), args.notes.resolve(), args.title, args.dry_run, targets["nightly"], args.prerelease)
+        publish(args.archive.resolve(), args.notes.resolve(), args.title, args.dry_run, targets["nightly"],
+                prerelease=args.prerelease, latest=args.latest)
     elif args.command == "check" and args.archive:
         if args.target == "all":
             raise Refused("Choose --target nightly or --target main when checking an existing archive")

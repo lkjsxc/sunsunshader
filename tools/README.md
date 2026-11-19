@@ -40,6 +40,8 @@ the current pack and requires byte identity. It then requires clean committed `m
 GitHub release with the checked Nightly archive, checksum and receipt. `--dry-run` performs the same checks
 without a GitHub write. The development archive is not published by this command.
 
-Release candidates use `--prerelease`. The tool also marks any version containing a hyphen
-as a GitHub pre-release automatically, so an `-rc` archive cannot silently become a stable release.
-This flag does not relax compatibility, source identity, cleanliness or pushed-commit checks.
+GitHub Latest must be the build that works on the current public Horizon Nightly.
+Use `--latest` to publish that build as a normal release, including an `-rc` version.
+The tool continues to default hyphenated versions to pre-releases, and
+`--prerelease` explicitly selects a pre-release. Both modes use the same checks
+for compatibility, source identity, cleanliness and the pushed commit.

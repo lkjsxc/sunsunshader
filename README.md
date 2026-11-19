@@ -2,7 +2,7 @@
 
 Sunsun Shader is a native shader pack for Horizon, the Minecraft client written in Rust. It provides warm light in the air, dark unlit Overworld spaces, directional shadows, clear blue daylight, layered clouds, and reflective water.
 
-Compatibility: [0.2.0-rc4](https://github.com/lkjsxc/sunsunshader/releases/tag/v0.2.0-rc4) is a pre-release for Horizon Nightly 2026-11-18 · dd67b76 (shader API 0.2), where older API 0.1 packs no longer load. Medium is the default profile. On Horizon Nightly 2026-11-13 · 9f42064, use [0.2.0-rc2](https://github.com/lkjsxc/sunsunshader/releases/tag/v0.2.0-rc2), which remains the GitHub Latest release.
+Compatibility: [0.2.0-rc4](https://github.com/lkjsxc/sunsunshader/releases/tag/v0.2.0-rc4) is a release for Horizon Nightly 2026-11-18 · dd67b76 (shader API 0.2), where older API 0.1 packs no longer load. Medium is the default profile. On Horizon Nightly 2026-11-13 · 9f42064, use [0.2.0-rc2](https://github.com/lkjsxc/sunsunshader/releases/tag/v0.2.0-rc2).
 
 The pictures below were taken with rc2 and rc3 on the previous Nightly. rc4 retains the same look.
 
