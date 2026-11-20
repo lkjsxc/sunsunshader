@@ -1,18 +1,18 @@
 # Sunsun Shader
 
-Sunsun Shader is a native shader pack for Horizon, the Minecraft client written in Rust. It provides warm light in the air, dark unlit Overworld spaces, directional shadows, clear blue daylight, layered clouds, and reflective water.
+Sunsun Shader is a native shader pack for Horizon, the Minecraft client written in Rust. It provides dark unlit Overworld spaces, directional shadows, clear blue daylight, layered clouds, reflective water and optional local light haze.
 
-Compatibility: [0.2.0-rc5](https://github.com/lkjsxc/sunsunshader/releases/tag/v0.2.0-rc5) is a release for Horizon Nightly 2026-11-19 · 5ef7734 (shader API 0.2), where older API 0.1 packs no longer load. Medium is the default profile. On Nightly 2026-11-18 · dd67b76, use [0.2.0-rc4](https://github.com/lkjsxc/sunsunshader/releases/tag/v0.2.0-rc4). On Horizon Nightly 2026-11-13 · 9f42064, use [0.2.0-rc2](https://github.com/lkjsxc/sunsunshader/releases/tag/v0.2.0-rc2).
+Compatibility: [0.2.0-rc6](https://github.com/lkjsxc/sunsunshader/releases/tag/v0.2.0-rc6) is a release for Horizon Nightly 2026-11-19 · 5ef7734 (shader API 0.2), where older API 0.1 packs no longer load. Medium is the default profile. On Nightly 2026-11-18 · dd67b76, use [0.2.0-rc4](https://github.com/lkjsxc/sunsunshader/releases/tag/v0.2.0-rc4). On Horizon Nightly 2026-11-13 · 9f42064, use [0.2.0-rc2](https://github.com/lkjsxc/sunsunshader/releases/tag/v0.2.0-rc2).
 
 ## Install
 
-Download [sunsunshader-0.2.0-rc5.hshader](https://github.com/lkjsxc/sunsunshader/releases/download/v0.2.0-rc5/sunsunshader-0.2.0-rc5.hshader) (SHA-256: 12dff8a0b1511eef04e0322e73659608d77ccf626b0d830f427b6c9b02f8abc3).
+Download [sunsunshader-0.2.0-rc6.hshader](https://github.com/lkjsxc/sunsunshader/releases/download/v0.2.0-rc6/sunsunshader-0.2.0-rc6.hshader) (SHA-256: bb098725bb44a4d17a6fb97545ca29f70af877c10943c47f19abf674121e3abe). [Release notes](docs/rc6-release.md)
 
 Put it in the game's shaderpacks/ folder and keep only one Sunsun archive there. Folder installation also works as shaderpacks/sunsunshader/.
 
 Select Sunsun Shader under Options → Video Settings → Shaders → Shader Packs.
 
-No experimental settings are needed. This candidate addresses haze flicker while walking and false halos near block edges.
+No experimental settings are needed. rc6 fixes detached trial-spawner halos when local haze is enabled and darkens the iron frames of ordinary and soul lanterns.
 
 ## Screenshot gallery
 
@@ -50,10 +50,9 @@ atmospheres.
 
 ## Profiles and measured cost
 
-The **Light in the air** option is on by default. Medium and High use it; Low
-retains optical bloom and skips the expensive added source/lunar sampling.
-The common graph retains its haze resources on Low. The option can also be
-turned off on Medium and High.
+The **Light in the air** option is off by default. Enable it on Medium or High
+for local light scattering. Low retains optical bloom and skips the local
+source sampling. The common graph retains its haze resources on Low.
 
 | Work | Low | Medium | High |
 | --- | ---: | ---: | ---: |
@@ -157,7 +156,7 @@ python3 tools/release.py build
 ```
 
 Both commands validate the pinned Nightly and API 0.2 development variants
-through unmodified Horizon validators. `--target nightly` builds this 0.2.0-rc5
+through unmodified Horizon validators. `--target nightly` builds the 0.2.0-rc6
 release candidate. The separate `pack-main/` remains the 0.1.1 development visual baseline;
 it is not the public Nightly download.
 
@@ -167,11 +166,10 @@ tests and exact packed-file checks. The permanent source tag is
 `nightly-source/2026-11-19-5ef7734`; distribution/source policy identities are
 pinned in [compatibility/horizon.json](compatibility/horizon.json).
 
-Save the reviewed rc5 notes to `.build/rc5-release-notes.md`. After validating
-and reviewing the final bytes, publish with:
+After validating and reviewing the final bytes, publish with the checked-in rc6 notes.
 
 ```sh
-python3 tools/release.py release dist/sunsunshader-0.2.0-rc5.hshader --notes .build/rc5-release-notes.md --latest
+python3 tools/release.py release dist/sunsunshader-0.2.0-rc6.hshader --notes docs/rc6-release.md --latest
 ```
 
 Publication rechecks those bytes, rebuilds for byte identity, and refuses a dirty
