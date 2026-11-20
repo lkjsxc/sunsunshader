@@ -63,6 +63,26 @@
       "weather": "rain"
     },
     {
+      "time": 18000,
+      "weather": "clear",
+      "full_detail_chunks": 6,
+      "trial_chamber": true,
+      "check_blocks": [
+        {
+          "position": [329, -26, 78],
+          "state": "minecraft:waxed_copper_bulb[lit=true,powered=false]"
+        }
+      ],
+      "id": "trial-atrium",
+      "position": [321.5, -23.98, 68.5],
+      "look": [-11, 2],
+      "structure_template": "minecraft:trial_chambers/corridor/atrium_1",
+      "structure_bounds": {
+        "min": [314, -30, 64],
+        "max": [334, -11, 92]
+      }
+    },
+    {
       "id": "trial-stair-hall",
       "position": [281.5, -26.98, 116.5],
       "look": [0.0, 1.0],

@@ -239,8 +239,8 @@ def capture_group(args, pin, cfg, scenes, detail, lod, size):
             ctl("key", "f1", "tap")
             if any(scene.get("trial_chamber") for scene in scenes):
                 trial = cfg["trial_chamber"]
-                ctl("tp", *trial["locate_origin"])
-                located = ctl("command", "locate structure minecraft:trial_chambers")
+                origin = " ".join(map(str, trial["locate_origin"]))
+                located = ctl("command", f"execute positioned {origin} run locate structure minecraft:trial_chambers")
                 x, z = trial["located_xz"]
                 match = rf"\[{x},\s*[^,]+,\s*{z}\]"
                 if not any(re.search(match, line) for line in located.get("chat", [])):

@@ -76,9 +76,10 @@ screenshot at the same frozen world time and camera pose on each replay.
 Terrain refinement follows the renderer’s wall clock.
 
 The trial-chamber run checks `/locate structure minecraft:trial_chambers`
-from `(0, 70, 0)` and expects the seed-42 result at X 272, Z 112. The four
-fixed poses were selected during a 40-frame native scouting pass. Each replay
-checks the generated subject block. The copper scene checks both lit bulbs.
+from `(0, 70, 0)` and expects the seed-42 result at X 272, Z 112. The five
+fixed poses were selected during a 42-frame native scouting pass. The
+atrium camera is inside the bounds of the generated `atrium_1` piece. Each
+replay checks the subject block, including both lit bulbs in the copper scene.
 
 ## Release readiness
 
