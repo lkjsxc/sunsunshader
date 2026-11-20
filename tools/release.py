@@ -109,6 +109,9 @@ def normal_game_admission(data, pin):
     for stage in pin.get("forbidden_sections", []):
         if stage in data:
             raise Refused(f"{pin['game_version']} does not admit [{stage}] in its normal configuration")
+    primaries = data.get("frame", {}).get("primaries")
+    if primaries in pin.get("forbidden_frame_primaries", []):
+        raise Refused(f"{pin['game_version']} does not draw [frame] primaries {primaries!r}")
 
 
 def official_check(binary, archive):
@@ -176,6 +179,20 @@ def self_test(binary, archive, target, pin):
         result = subprocess.run([str(binary), "check", str(bad), "--json"], text=True, capture_output=True)
         if result.returncode == 0 or "unknown field" not in result.stdout or "sunsun_unknown_compatibility_probe" not in result.stdout:
             raise Refused("Negative gate test failed: the released parser must reject unknown manifest fields")
+        if target == "nightly" and pin["normal_game_api"] == "0.2":
+            obsolete = Path(scratch) / "obsolete-api.hshader"
+            alter_manifest(archive, obsolete, lambda text: text.replace('api = "0.2"', 'api = "0.1"', 1))
+            result = subprocess.run([str(binary), "check", str(obsolete), "--json"], text=True, capture_output=True)
+            if result.returncode == 0 or "needs shader API 0.1" not in result.stdout:
+                raise Refused("Negative gate test failed: the released parser must reject obsolete API 0.1")
+            wide_gamut = manifest(archive)
+            wide_gamut["frame"] = {"primaries": "bt2020"}
+            for forbidden in (wide_gamut, {**manifest(archive), "motion": {}}):
+                try:
+                    normal_game_admission(forbidden, pin)
+                except Refused:
+                    continue
+                raise Refused("Negative gate test failed: ordinary API 0.2 game accepted an unsupported option")
         if target == "nightly" and pin["normal_game_api"] == "0.1":
             experimental = Path(scratch) / "experimental-api.hshader"
             alter_manifest(archive, experimental, lambda text: text.replace('api = "0.1"', 'api = "0.2"', 1))

@@ -54,7 +54,8 @@ fn material(input: MaterialInput) -> Surface {
         color *= mix(1.0, source_peak / max(peak, 0.00001), clamp(emission, 0.0, 1.0));
     }
     if !input.translucent {
-        set_surface(normal, wet * 0.65, ss_surface_data(input.light, emission, sources));
+        // Reserved native-B codec; the actual wet lighting above stays unchanged.
+        set_surface(normal, ss_haze_encode_receiver(input.light.x), ss_surface_data(input.light, emission, sources));
     }
     // Engine coverage keeps the native cutout test; translucent alpha stays coverage.
     // Keep rc3's texture/tint coverage expression without changing geometry.

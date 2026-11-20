@@ -2,19 +2,19 @@
 
 Sunsun Shader is a native shader pack for Horizon, the Minecraft client written in Rust. It provides warm light in the air, dark unlit Overworld spaces, directional shadows, clear blue daylight, layered clouds, and reflective water.
 
-Compatibility: [0.2.0-rc4](https://github.com/lkjsxc/sunsunshader/releases/tag/v0.2.0-rc4) is a release for Horizon Nightly 2026-11-18 · dd67b76 (shader API 0.2), where older API 0.1 packs no longer load. Medium is the default profile. On Horizon Nightly 2026-11-13 · 9f42064, use [0.2.0-rc2](https://github.com/lkjsxc/sunsunshader/releases/tag/v0.2.0-rc2).
+Compatibility: [0.2.0-rc5](https://github.com/lkjsxc/sunsunshader/releases/tag/v0.2.0-rc5) is a release for Horizon Nightly 2026-11-19 · 5ef7734 (shader API 0.2), where older API 0.1 packs no longer load. Medium is the default profile. On Horizon Nightly 2026-11-13 · 9f42064, use [0.2.0-rc2](https://github.com/lkjsxc/sunsunshader/releases/tag/v0.2.0-rc2).
 
-The pictures below were taken with rc2 and rc3 on the previous Nightly. rc4 retains the same look.
+The pictures below show the established look in rc2 and rc3.
 
 ## Install
 
-Download [sunsunshader-0.2.0-rc4.hshader](https://github.com/lkjsxc/sunsunshader/releases/download/v0.2.0-rc4/sunsunshader-0.2.0-rc4.hshader) (SHA-256: 6768644d5b428ca34bb104a1c15ceb5db077ffe633a29d5fe981e4a045825371).
+Download [sunsunshader-0.2.0-rc5.hshader](https://github.com/lkjsxc/sunsunshader/releases/download/v0.2.0-rc5/sunsunshader-0.2.0-rc5.hshader) (SHA-256: 12dff8a0b1511eef04e0322e73659608d77ccf626b0d830f427b6c9b02f8abc3).
 
 Put it in the game's shaderpacks/ folder and keep only one Sunsun archive there. Folder installation also works as shaderpacks/sunsunshader/.
 
 Select Sunsun Shader under Options → Video Settings → Shaders → Shader Packs.
 
-No experimental settings are needed. Lamp haze can still flicker while walking, as in rc3.
+No experimental settings are needed. This candidate addresses haze flicker while walking and false halos near block edges.
 
 ![Warm lantern air against a dark village sky](docs/media/night.jpg)
 ![Torch and lava haze beside black cave recesses](docs/media/cave.jpg)
@@ -53,8 +53,8 @@ atmospheres.
 
 The **Light in the air** option is on by default. Medium and High use it; Low
 retains optical bloom and skips the expensive added source/lunar sampling.
-The common graph still declares four small extra passes and one extra haze
-target on Low. Turning the option off is also available on Medium/High.
+The common graph retains its haze resources on Low. The option can also be
+turned off on Medium and High.
 
 | Work | Low | Medium | High |
 | --- | ---: | ---: | ---: |
@@ -74,13 +74,10 @@ Cloud traversal counts are bounds with geometric early exits; procedural density
 work is arithmetic. One shadow comparison lookup performs native 2×2 PCF, with
 opaque and transmitting maps sampled separately.
 
-Local-source discovery works at one quarter of each image dimension. Its first
-spread uses up to 25 field reads at 960×540 and 121 at 1920×1080; a capped search
-and matching finite fade bound larger resolutions. The final gather/evaluation
-uses up to 17 explicit reads on Medium or 27 on High per quarter-resolution
-pixel, excluding the engine's post-input wrapper. The full
-[sampling audit](https://github.com/lkjsxc/sunsunshader/releases/download/v0.2.0-rc2/sampling-costs.md)
-accounts for metadata/depth reads, all passes, quality gates and target memory.
+The local-light field accumulates visible observations in kept world buffers.
+Quarter-resolution textures carry separate contributions for receiver lighting
+and emitter halos. The earlier rc2/rc3 measurements below give historical
+context for the look before that change.
 
 <!-- LOOK5_COSTS_BEGIN -->
 | Scene | Profile | rc1 before, ms | rc2, ms | rc1 after, ms | Change vs bracket | rc1 drift |
@@ -138,6 +135,8 @@ not the water mesh.
 
 Further public-Nightly limits remain:
 
+- The current Horizon renderer can lose distant terrain casters at short
+  full-detail distances. See [Horizon #19015](https://github.com/horizon-rust/horizon/pull/19015).
 - Entity materials retain native lighting; offscreen entity casters can leave
   the native shadow map.
 - The world buffer is bounded gamma colour. Highlight shoulders preserve
@@ -159,25 +158,25 @@ python3 tools/release.py build
 ```
 
 Both commands validate the pinned Nightly and API 0.2 development variants
-through unmodified Horizon validators. `--target nightly` builds this 0.2.0-rc2
-release. The separate `pack-main/` remains the 0.1.1 development visual baseline;
+through unmodified Horizon validators. `--target nightly` builds this 0.2.0-rc5
+release candidate. The separate `pack-main/` remains the 0.1.1 development visual baseline;
 it is not the public Nightly download.
 
-The ordinary-game admission check matters: the standalone Nightly parser accepts
-experimental features the ordinary game refuses. CI includes negative refusal
+The ordinary-game admission check adds the restrictions of the pinned Nightly
+renderer to its standalone parser and validator. CI includes negative refusal
 tests and exact packed-file checks. The permanent source tag is
-`nightly-source/2026-11-13-9f42064`; distribution/source policy identities are
+`nightly-source/2026-11-19-5ef7734`; distribution/source policy identities are
 pinned in [compatibility/horizon.json](compatibility/horizon.json).
 
 After validating and reviewing the final bytes, publish with:
 
 ```sh
-python3 tools/release.py release dist/sunsunshader-0.2.0-rc2.hshader --notes release-notes.md --prerelease
+python3 tools/release.py release dist/sunsunshader-0.2.0-rc5.hshader --notes release-notes.md --latest
 ```
 
 Publication rechecks those bytes, rebuilds for byte identity, and refuses a dirty
-checkout, an unpushed source commit or a mismatching tag. Release candidates are
-always pre-releases. See [tools/README.md](tools/README.md) for the gate and pin
+checkout, an unpushed source commit or a mismatching tag. The GitHub Latest release is the candidate for the current public Horizon Nightly.
+See [tools/README.md](tools/README.md) for the gate and pin
 maintenance.
 
 All shader code is original and Apache-2.0 licensed. Published mathematical

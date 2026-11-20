@@ -1,7 +1,7 @@
 schema = 1
 id = "sunsunshader"
 name = "Sunsun Shader"
-version = "0.2.0-rc4"
+version = "0.2.0-rc5"
 api = "0.2"
 description = "Warm light, cool shade and weathered air."
 authors = ["lkjsxc"]
@@ -15,8 +15,8 @@ blend = "gamma"
 primaries = "bt709"
 fog = "pack"
 
-# Source coordinates, emission codes and bilateral depth require all four channels.
-# These resources are overwritten before each read; no previous-frame values are used.
+# Existing paired view targets: bloom data and additive haze plus endpoint distance.
+# World observations live only in the explicitly keyed buffers below.
 [[resource]]
 name = "ss_bright"
 format = "rgba16float"
@@ -41,6 +41,36 @@ format = "rgba16float"
 scale = 0.25
 keep = "view"
 
+[[resource]]
+name = "ss_emitter_halo"
+format = "rgba16float"
+scale = 0.25
+keep = "view"
+
+[kept]
+# Native lifecycle clears world resources on a camera jump farther than64 blocks.
+reach = 64
+
+[[resource]]
+name = "ss_world_light"
+buffer = 19923008
+element = "vec4<u32>"
+keep = "world"
+
+[[resource]]
+name = "ss_light_accum"
+buffer = 13107264
+element = "atomic<u32>"
+keep = "world"
+
+[[before_world]]
+file = "shaders/haze_clear.wgsl"
+files = ["shaders/haze_protocol.wgsl"]
+dispatch = [32, 32, 32]
+workgroup = [4, 4, 4]
+reads = ["ss_world_light"]
+writes = ["ss_light_accum"]
+
 [sky]
 file = "shaders/sky.wgsl"
 sun = false
@@ -49,42 +79,54 @@ clouds = false
 
 [material]
 file = "shaders/material.wgsl"
-files = ["shaders/shadows.wgsl", "shaders/water.wgsl"]
+files = ["shaders/shadows.wgsl", "shaders/water.wgsl", "shaders/haze_codec.wgsl"]
 
 
 [vertex]
 file = "shaders/vertex.wgsl"
 
 [[post]]
-file = "shaders/emitter_seed.wgsl"
-name = "Visible light sources"
-output = "ss_bright"
+file = "shaders/haze_observe.wgsl"
+files = ["shaders/haze_protocol.wgsl", "shaders/haze_codec.wgsl"]
+name = "Observe native receiver light"
+compute = true
+dispatch = "pixels"
+workgroup = [8, 8, 1]
+writes = ["ss_light_accum"]
 
 [[post]]
-file = "shaders/emitter_spread_a.wgsl"
-reads = ["ss_bright"]
-files = ["shaders/emitter_field.wgsl"]
-name = "Light positions wide"
-output = "ss_blur"
+file = "shaders/haze_resolve.wgsl"
+files = ["shaders/haze_protocol.wgsl", "shaders/haze_codec.wgsl"]
+name = "Resolve world light observations"
+compute = true
+dispatch = [32, 32, 32]
+workgroup = [4, 4, 4]
+reads = ["ss_light_accum"]
+writes = ["ss_world_light"]
 
 [[post]]
-file = "shaders/emitter_spread_b.wgsl"
-reads = ["ss_blur"]
-files = ["shaders/emitter_field.wgsl"]
-name = "Light positions near"
-output = "ss_bloom"
+file = "shaders/haze_air_field.wgsl"
+files = ["shaders/haze_protocol.wgsl"]
+name = "Reconstruct observed light in air"
+compute = true
+dispatch = [32, 32, 32]
+workgroup = [4, 4, 4]
+writes = ["ss_world_light"]
 
 [[post]]
-file = "shaders/emitter_scatter.wgsl"
-reads = ["ss_bloom"]
-files = ["shaders/emitter_field.wgsl"]
-name = "Local light scattering"
-output = "ss_haze"
+file = "shaders/haze_scatter.wgsl"
+files = ["shaders/haze_protocol.wgsl"]
+name = "Integrate world light haze"
+compute = true
+dispatch = "pixels"
+workgroup = [8, 8, 1]
+reads = ["ss_world_light"]
+writes = ["ss_haze", "ss_emitter_halo"]
 
 [[post]]
 file = "shaders/air.wgsl"
-reads = ["ss_haze"]
-files = ["shaders/shadows.wgsl", "shaders/lunar_air.wgsl"]
+reads = ["ss_haze", "ss_emitter_halo"]
+files = ["shaders/shadows.wgsl", "shaders/lunar_air.wgsl", "shaders/haze_codec.wgsl"]
 name = "Air"
 
 [[post]]
