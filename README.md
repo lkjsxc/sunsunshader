@@ -2,7 +2,7 @@
 
 Sunsun Shader is a native shader pack for Horizon, the Minecraft client written in Rust. It provides warm light in the air, dark unlit Overworld spaces, directional shadows, clear blue daylight, layered clouds, and reflective water.
 
-Compatibility: [0.2.0-rc5](https://github.com/lkjsxc/sunsunshader/releases/tag/v0.2.0-rc5) is a release for Horizon Nightly 2026-11-19 · 5ef7734 (shader API 0.2), where older API 0.1 packs no longer load. Medium is the default profile. On Horizon Nightly 2026-11-13 · 9f42064, use [0.2.0-rc2](https://github.com/lkjsxc/sunsunshader/releases/tag/v0.2.0-rc2).
+Compatibility: [0.2.0-rc5](https://github.com/lkjsxc/sunsunshader/releases/tag/v0.2.0-rc5) is a release for Horizon Nightly 2026-11-19 · 5ef7734 (shader API 0.2), where older API 0.1 packs no longer load. Medium is the default profile. On Nightly 2026-11-18 · dd67b76, use [0.2.0-rc4](https://github.com/lkjsxc/sunsunshader/releases/tag/v0.2.0-rc4). On Horizon Nightly 2026-11-13 · 9f42064, use [0.2.0-rc2](https://github.com/lkjsxc/sunsunshader/releases/tag/v0.2.0-rc2).
 
 The pictures below show the established look in rc2 and rc3.
 
@@ -120,8 +120,7 @@ graded outside the pack. The promotional film is kept separate from this release
 
 The local air field sees **visible emitting terrain only**. Offscreen and fully
 covered sources, including emitters hidden by glass, are outside that effect.
-One source survives each seed/propagation cell before the two/three-source gather;
-competition can discard a light. Screen-depth checks reduce visible obstruction
+The bounded world field and gather budget can omit a light when several sources compete. Screen-depth checks reduce visible obstruction
 errors but cannot recover hidden geometry or provide full local-light transport.
 Native block lighting still supplies its existing surface falloff and wall
 occlusion.
@@ -144,8 +143,8 @@ Further public-Nightly limits remain:
   still blend in gamma space.
 - The moon keeps its native phase texture. Only the added sky aureole estimates
   phase from visible pixels; surface and water lunar light remain phase-agnostic.
-- Contact shade sees visible solid terrain. Motion uses spatial filtering,
-  without temporal accumulation or object-motion guides. Native precipitation
+- Contact shade sees visible solid terrain. Motion uses spatial filtering without screen-space temporal accumulation or
+  object-motion guides. Native precipitation
   ordering, and camera-biome snow/auroras, remain limitations.
 
 ## Build and check
@@ -168,10 +167,11 @@ tests and exact packed-file checks. The permanent source tag is
 `nightly-source/2026-11-19-5ef7734`; distribution/source policy identities are
 pinned in [compatibility/horizon.json](compatibility/horizon.json).
 
-After validating and reviewing the final bytes, publish with:
+Save the reviewed rc5 notes to `.build/rc5-release-notes.md`. After validating
+and reviewing the final bytes, publish with:
 
 ```sh
-python3 tools/release.py release dist/sunsunshader-0.2.0-rc5.hshader --notes release-notes.md --latest
+python3 tools/release.py release dist/sunsunshader-0.2.0-rc5.hshader --notes .build/rc5-release-notes.md --latest
 ```
 
 Publication rechecks those bytes, rebuilds for byte identity, and refuses a dirty
