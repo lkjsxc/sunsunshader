@@ -58,8 +58,11 @@ def write_gallery(args, cfg, images, inputs):
     manifest = {
         "nightly": inputs["nightly"], "pack_sha256": inputs["pack_sha256"],
         "backend": inputs["backend"], "format": inputs["format"],
-        "renderer": inputs["renderer"], "scenes": [],
+        "renderer": inputs["renderer"], "capture_size": cfg["capture_size"],
+        "thumbnail_size": cfg["thumbnail_size"], "scenes": [],
     }
+    if version := inputs.get("pack_version"):
+        manifest["pack_version"] = version
     files = []
     for scene, image in images:
         image_name, thumb_name = f"{scene}.jpg", f"{scene}-thumb.jpg"
@@ -97,6 +100,8 @@ def main():
         run = json.loads((folder / "inputs.json").read_text())
         if any(run[key] != inputs[key] for key in identity_keys):
             raise ValueError("Use completed runs with matching pack, Nightly, size and backend")
+        if "pack_version" in run:
+            inputs.setdefault("pack_version", run["pack_version"])
         complete = json.loads((folder / "complete.json").read_text())
         sources.update((scene, folder) for scene in complete["scenes"])
     selections = args.scene or list(sources)

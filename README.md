@@ -4,8 +4,6 @@ Sunsun Shader is a native shader pack for Horizon, the Minecraft client written 
 
 Compatibility: [0.2.0-rc5](https://github.com/lkjsxc/sunsunshader/releases/tag/v0.2.0-rc5) is a release for Horizon Nightly 2026-11-19 · 5ef7734 (shader API 0.2), where older API 0.1 packs no longer load. Medium is the default profile. On Nightly 2026-11-18 · dd67b76, use [0.2.0-rc4](https://github.com/lkjsxc/sunsunshader/releases/tag/v0.2.0-rc4). On Horizon Nightly 2026-11-13 · 9f42064, use [0.2.0-rc2](https://github.com/lkjsxc/sunsunshader/releases/tag/v0.2.0-rc2).
 
-The pictures below show the established look in rc2 and rc3.
-
 ## Install
 
 Download [sunsunshader-0.2.0-rc5.hshader](https://github.com/lkjsxc/sunsunshader/releases/download/v0.2.0-rc5/sunsunshader-0.2.0-rc5.hshader) (SHA-256: 12dff8a0b1511eef04e0322e73659608d77ccf626b0d830f427b6c9b02f8abc3).
@@ -16,12 +14,13 @@ Select Sunsun Shader under Options → Video Settings → Shaders → Shader Pac
 
 No experimental settings are needed. This candidate addresses haze flicker while walking and false halos near block edges.
 
-![Warm lantern air against a dark village sky](docs/media/night.jpg)
-![Torch and lava haze beside black cave recesses](docs/media/cave.jpg)
-![A soft lunar aureole over the shore](docs/media/moon.jpg)
-![Clear coastal daylight retained as the control](docs/media/noon.jpg)
-![Shallow water and reflected clouds](docs/media/shore.jpg)
-![Dark foreground and distant mist in a rainy forest](docs/media/forest.jpg)
+## Screenshot gallery
+
+[![Oak-fence lantern posts beside a village house at midnight](docs/media/rc5/night-lantern-thumb.jpg)](docs/media/rc5/night-lantern.jpg)
+
+The rc5 gallery uses Medium on Horizon Nightly 2026-11-19 · 5ef7734.
+The images were captured in 1920×1080 SDR with Mesa llvmpipe.
+[More scenes](docs/gallery.md) · [Capture settings](docs/gallery-capture.md)
 
 ## Light, darkness and water
 
@@ -114,9 +113,10 @@ field, camera motion blur and vignette are off by default.
 include the installable archive, SHA-256, ordinary-game gate receipt,
 [native paired sheet](https://github.com/lkjsxc/sunsunshader/releases/download/v0.2.0-rc2/contact.jpg),
 [review](https://github.com/lkjsxc/sunsunshader/releases/download/v0.2.0-rc2/report.md)
-and retained rounds. Each primary cell is a native 960×540 capture. The README
-photographs come from those exact pack bytes; scene pixels are not repainted or
-graded outside the pack. The promotional film is kept separate from this release.
+and retained rounds. Each primary cell in the rc2 comparison is a native
+960×540 capture from the pack bytes tested in that round. The rc5 gallery has
+its own capture record. The promotional film is kept separate from this
+release. [rc5 capture settings](docs/gallery-capture.md)
 
 The local air field sees **visible emitting terrain only**. Offscreen and fully
 covered sources, including emitters hidden by glass, are outside that effect.

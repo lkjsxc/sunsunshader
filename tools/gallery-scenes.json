@@ -26,8 +26,8 @@
     },
     {
       "id": "cave",
-      "position": [158.5, 30, -1555.5],
-      "look": [-20, 4],
+      "position": [161.5, 32, -1554.5],
+      "look": [-45, 23],
       "time": 18000,
       "weather": "clear",
       "setup": "cave-lava"
@@ -54,6 +54,77 @@
       "weather": "clear",
       "full_detail_chunks": 4,
       "lod_chunks": 64
+    },
+    {
+      "id": "rain-coast",
+      "position": [132, 70, -1585],
+      "look": [120, 0],
+      "time": 10000,
+      "weather": "rain"
+    },
+    {
+      "id": "trial-stair-hall",
+      "position": [281.5, -26.98, 116.5],
+      "look": [0.0, 1.0],
+      "time": 18000,
+      "weather": "clear",
+      "full_detail_chunks": 6,
+      "trial_chamber": true,
+      "check_blocks": [
+        {
+          "position": [281, -26, 124],
+          "state": "minecraft:waxed_exposed_copper_bulb[lit=true,powered=false]"
+        }
+      ]
+    },
+    {
+      "id": "trial-spawner",
+      "position": [306.5, -23.98, 134.5],
+      "look": [0.0, 10.76],
+      "time": 18000,
+      "weather": "clear",
+      "full_detail_chunks": 6,
+      "trial_chamber": true,
+      "check_blocks": [
+        {
+          "position": [306, -24, 140],
+          "state": "minecraft:trial_spawner[ominous=false,trial_spawner_state=waiting_for_players]"
+        }
+      ]
+    },
+    {
+      "id": "trial-vault",
+      "position": [294.5, -23.98, 144.5],
+      "look": [95.54, 7.32],
+      "time": 18000,
+      "weather": "clear",
+      "full_detail_chunks": 6,
+      "trial_chamber": true,
+      "check_blocks": [
+        {
+          "position": [288, -23, 145],
+          "state": "minecraft:vault[facing=east,ominous=false,vault_state=inactive]"
+        }
+      ]
+    },
+    {
+      "id": "trial-copper",
+      "position": [281.5, -26.98, 120.5],
+      "look": [67.87, -6.01],
+      "time": 18000,
+      "weather": "clear",
+      "full_detail_chunks": 6,
+      "trial_chamber": true,
+      "check_blocks": [
+        {
+          "position": [273, -26, 121],
+          "state": "minecraft:waxed_copper_bulb[lit=true,powered=false]"
+        },
+        {
+          "position": [273, -26, 116],
+          "state": "minecraft:waxed_weathered_copper_bulb[lit=true,powered=false]"
+        }
+      ]
     }
   ],
   "setup": {
@@ -79,5 +150,10 @@
       "setblock 165 29 -1553 minecraft:lava",
       "setblock 164 29 -1551 minecraft:lava"
     ]
+  },
+  "fov": 70,
+  "trial_chamber": {
+    "locate_origin": [0, 70, 0],
+    "located_xz": [272, 112]
   }
 }

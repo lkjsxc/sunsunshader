@@ -1,0 +1,63 @@
+{
+  "nightly": "nightly-2026-11-19-5ef7734",
+  "pack_sha256": "12dff8a0b1511eef04e0322e73659608d77ccf626b0d830f427b6c9b02f8abc3",
+  "backend": "software",
+  "format": "SDR",
+  "renderer": "llvmpipe (LLVM 20.1.2, 256 bits)",
+  "capture_size": [
+    1920,
+    1080
+  ],
+  "thumbnail_size": [
+    480,
+    270
+  ],
+  "scenes": [
+    {
+      "id": "night-lantern",
+      "image": "night-lantern.jpg",
+      "thumbnail": "night-lantern-thumb.jpg"
+    },
+    {
+      "id": "sunset-water",
+      "image": "sunset-water.jpg",
+      "thumbnail": "sunset-water-thumb.jpg"
+    },
+    {
+      "id": "cave",
+      "image": "cave.jpg",
+      "thumbnail": "cave-thumb.jpg"
+    },
+    {
+      "id": "distant-lod",
+      "image": "distant-lod.jpg",
+      "thumbnail": "distant-lod-thumb.jpg"
+    },
+    {
+      "id": "rain-coast",
+      "image": "rain-coast.jpg",
+      "thumbnail": "rain-coast-thumb.jpg"
+    },
+    {
+      "id": "trial-stair-hall",
+      "image": "trial-stair-hall.jpg",
+      "thumbnail": "trial-stair-hall-thumb.jpg"
+    },
+    {
+      "id": "trial-spawner",
+      "image": "trial-spawner.jpg",
+      "thumbnail": "trial-spawner-thumb.jpg"
+    },
+    {
+      "id": "trial-vault",
+      "image": "trial-vault.jpg",
+      "thumbnail": "trial-vault-thumb.jpg"
+    },
+    {
+      "id": "trial-copper",
+      "image": "trial-copper.jpg",
+      "thumbnail": "trial-copper-thumb.jpg"
+    }
+  ],
+  "pack_version": "0.2.0-rc5"
+}

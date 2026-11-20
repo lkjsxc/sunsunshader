@@ -75,9 +75,14 @@ distant scene waits for resident far terrain and uses Horizon’s native still
 screenshot at the same frozen world time and camera pose on each replay.
 Terrain refinement follows the renderer’s wall clock.
 
+The trial-chamber run checks `/locate structure minecraft:trial_chambers`
+from `(0, 70, 0)` and expects the seed-42 result at X 272, Z 112. The four
+fixed poses were selected during a 40-frame native scouting pass. Each replay
+checks the generated subject block. The copper scene checks both lit bulbs.
+
 ## Release readiness
 
-- Check `complete.json` and the per-frame receipts for the six catalogue scenes.
+- Check `complete.json` and the per-frame receipts for the baseline and chosen trial-chamber scenes.
   Verify the pack hash, renderer, dimensions, scene state and LOD residency.
 - Generate the private contact sheet and have Claude review the actual frames.
   Supply another completed run after the baseline directory to use reviewed
@@ -91,10 +96,11 @@ Terrain refinement follows the renderer’s wall clock.
 
 ```sh
 python3 tools/gallery-assets.py .build/gallery-radeon --sheet .build/review.jpg
-python3 tools/gallery-assets.py .build/gallery-radeon --gallery docs/media/rc5 \
+python3 tools/gallery-assets.py .build/gallery-radeon --gallery .build/gallery-release-assets \
   --archive .build/sunsunshader-rc5-gallery.zip \
-  --scene night-lantern --scene rain --scene cave --scene sunset-water \
-  --scene distant-lod --scene noon
+  --scene night-lantern --scene sunset-water --scene cave --scene distant-lod \
+  --scene rain-coast --scene trial-stair-hall --scene trial-spawner \
+  --scene trial-vault --scene trial-copper
 ```
 
 The asset command requires Pillow. It resizes the thumbnails and compresses
