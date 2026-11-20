@@ -1,0 +1,83 @@
+{
+  "schema": 1,
+  "world": "SunsunGallery",
+  "seed": 42,
+  "profile": "Medium",
+  "capture_size": [1920, 1080],
+  "scout_size": [480, 270],
+  "thumbnail_size": [480, 270],
+  "full_detail_chunks": 10,
+  "scenes": [
+    {
+      "id": "night-lantern",
+      "position": [163, 66, -1601],
+      "look": [145, -4],
+      "time": 18000,
+      "weather": "clear",
+      "setup": "lanterns"
+    },
+    {
+      "id": "rain",
+      "position": [154.5, 67, -1602.5],
+      "look": [-90, -4],
+      "time": 18000,
+      "weather": "rain",
+      "setup": "lanterns"
+    },
+    {
+      "id": "cave",
+      "position": [158.5, 30, -1555.5],
+      "look": [-20, 4],
+      "time": 18000,
+      "weather": "clear",
+      "setup": "cave-lava"
+    },
+    {
+      "id": "sunset-water",
+      "position": [125, 65.5, -1586],
+      "look": [90, 4],
+      "time": 12300,
+      "weather": "clear"
+    },
+    {
+      "id": "noon",
+      "position": [152, 77, -1608],
+      "look": [30, 10],
+      "time": 6000,
+      "weather": "clear"
+    },
+    {
+      "id": "distant-lod",
+      "position": [176, 77, -1650],
+      "look": [30, 10],
+      "time": 9000,
+      "weather": "clear",
+      "full_detail_chunks": 4,
+      "lod_chunks": 64
+    }
+  ],
+  "setup": {
+    "lanterns": [
+      "setblock 160 66 -1603 minecraft:oak_fence",
+      "setblock 160 67 -1603 minecraft:oak_fence",
+      "setblock 160 68 -1603 minecraft:lantern",
+      "setblock 151 67 -1607 minecraft:oak_fence",
+      "setblock 151 68 -1607 minecraft:oak_fence",
+      "setblock 151 69 -1607 minecraft:lantern"
+    ],
+    "cave-lava": [
+      "setblock 163 30 -1552 minecraft:air",
+      "setblock 164 30 -1552 minecraft:air",
+      "setblock 165 30 -1552 minecraft:air",
+      "setblock 164 30 -1553 minecraft:air",
+      "setblock 165 30 -1553 minecraft:air",
+      "setblock 164 30 -1551 minecraft:air",
+      "setblock 163 29 -1552 minecraft:lava",
+      "setblock 164 29 -1552 minecraft:lava",
+      "setblock 165 29 -1552 minecraft:lava",
+      "setblock 164 29 -1553 minecraft:lava",
+      "setblock 165 29 -1553 minecraft:lava",
+      "setblock 164 29 -1551 minecraft:lava"
+    ]
+  }
+}

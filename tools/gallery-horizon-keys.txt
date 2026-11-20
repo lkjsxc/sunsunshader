@@ -1,0 +1,2 @@
+# Ed25519 public release key from Horizon's crates/horizon-release-sign/release-keys.txt.
+MU4oiIQcCxkZvbwSjjXs7SySCuM6ywRQ3nGaJYZG0gw=

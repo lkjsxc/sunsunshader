@@ -1,0 +1,19 @@
+{
+  "schema": 1,
+  "pack": {
+    "sha256": "12dff8a0b1511eef04e0322e73659608d77ccf626b0d830f427b6c9b02f8abc3",
+    "source_revision": "6dfcd7b6541acbafef75a6334fb0c4f23b8f4ed8",
+    "id": "sunsunshader",
+    "version": "0.2.0-rc5",
+    "frame_primaries": "bt709"
+  },
+  "horizon": {
+    "nightly": "nightly-2026-11-19-5ef7734",
+    "source_revision": "5ef7734fdd854add5efd6817178be3c988d8d050",
+    "archive_sha256": "b682f4fca4fe521ad3df785b51b523a60789bf778267050794b9d678103a1956",
+    "binaries": {
+      "horizon-client": "36e26e14f6708e7feb54894ff16dfc87b3e3d3bcd47dd2767b3e561d9eb61b8a",
+      "horizon-ctl": "08542c1fe446f02df228760308454192d97a4ab686a5530d7efd211a7344402c"
+    }
+  }
+}
