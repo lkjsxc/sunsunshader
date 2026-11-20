@@ -1,7 +1,7 @@
 schema = 1
 id = "sunsunshader"
 name = "Sunsun Shader"
-version = "0.2.0-rc5"
+version = "0.2.0-rc6"
 api = "0.2"
 description = "Warm light, cool shade and weathered air."
 authors = ["lkjsxc"]
@@ -223,6 +223,11 @@ sprites = ["block/glow_lichen"]
 [[tags]]
 id = "trial_spawner_cage"
 sprites = ["block/trial_spawner_*"]
+
+# Tag mask 16u (index 4) confines texel-aware colour emission to lanterns.
+[[tags]]
+id = "framed_emitter"
+sprites = ["block/lantern", "block/soul_lantern"]
 
 [[lights]]
 color = [1.0, 0.64, 0.32]

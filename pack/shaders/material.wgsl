@@ -17,6 +17,18 @@ fn material(input: MaterialInput) -> Surface {
     // semantic for this exact sprite; its native receiver light stays intact.
     // The third manifest sprite tag has mask 4u (index 2); earlier tags stay fixed.
     let emission = select(input.emission, 0.0, (input.tags & 4u) != 0u);
+    // The sprite ID is independent of per-block light. Classify the original
+    // sampled texel, before face tint, wet darkening and weather desaturation.
+    // Fade the distinction at mip distance rather than classifying mixed mips.
+    var colour_emission = emission;
+    if (input.tags & 16u) != 0u {
+        let texel = input.albedo.rgb;
+        let brightness = 0.5 * (dot(texel, vec3<f32>(0.2126, 0.7152, 0.0722))
+            + max(texel.r, max(texel.g, texel.b)));
+        let glass = smoothstep(0.12, 0.35, brightness);
+        let near = 1.0 - smoothstep(12.0, 24.0, length(input.position));
+        colour_emission = emission * mix(1.0, glass, near);
+    }
     let normal = input.normal;
     let view = -normalize(input.position + vec3<f32>(0.0, 0.000001, 0.0));
     // Read the combined native vertex tint retained by API 0.2, already linear.
@@ -42,9 +54,9 @@ fn material(input: MaterialInput) -> Surface {
     let sources = block_light_color(input.position);
     let visibility = ss_shadow(input.position, normal);
     let illumination = ss_surface_light(normal, view, input.light, visibility,
-        sources, input.colored_light, foliage, emission);
+        sources, input.colored_light, foliage, colour_emission);
     var color = albedo * illumination;
-    color += ss_surface_emission(albedo, emission);
+    color += ss_surface_emission(albedo, colour_emission);
     if wet > 0.001 && !input.translucent {
         let facing = max(dot(normal, view), 0.0);
         let fresnel = 0.025 + 0.975 * pow(1.0 - facing, 5.0);
@@ -55,12 +67,12 @@ fn material(input: MaterialInput) -> Surface {
         color += min(sparkle, 0.8) * ss_sun_color() * ss_daylight()
             * visibility * wet * 0.24;
     }
-    if emission > 0.001 {
+    if colour_emission > 0.001 {
         // Retain rc3's source texture shoulder before the compatibility range bound.
         // A continuous shoulder avoids the flat hue-normalized lava plateau.
         let peak = max(color.r, max(color.g, color.b));
         let source_peak = 1.0 - exp(-max(peak, 0.0) * 1.10);
-        color *= mix(1.0, source_peak / max(peak, 0.00001), clamp(emission, 0.0, 1.0));
+        color *= mix(1.0, source_peak / max(peak, 0.00001), clamp(colour_emission, 0.0, 1.0));
     }
     if !input.translucent {
         // Reserved native-B codec; the actual wet lighting above stays unchanged.
