@@ -202,9 +202,9 @@ step = 0.1
 [[options]]
 id = "local_haze"
 name = "Light in the air"
-description = "Scatter visible lights in damp or enclosed air on Medium and High."
+description = "Opt in to light scattering in damp or enclosed air on Medium and High."
 type = "bool"
-default = true
+default = false
 
 [[tags]]
 id = "foliage"

@@ -3,7 +3,7 @@
 override quality: u32 = 1u;
 override exposure: f32 = 1.0;
 override haze: f32 = 1.0;
-override local_haze: bool = true;
+override local_haze: bool = false;
 
 override shadows: bool = true;
 override water_reflections: bool = true;
