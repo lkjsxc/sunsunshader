@@ -39,6 +39,11 @@
       "thumbnail": "rain-coast-thumb.jpg"
     },
     {
+      "id": "trial-atrium",
+      "image": "trial-atrium.jpg",
+      "thumbnail": "trial-atrium-thumb.jpg"
+    },
+    {
       "id": "trial-stair-hall",
       "image": "trial-stair-hall.jpg",
       "thumbnail": "trial-stair-hall-thumb.jpg"

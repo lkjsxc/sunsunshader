@@ -100,7 +100,7 @@ python3 tools/gallery-assets.py .build/gallery-radeon --sheet .build/review.jpg
 python3 tools/gallery-assets.py .build/gallery-radeon --gallery .build/gallery-release-assets \
   --archive .build/sunsunshader-rc5-gallery.zip \
   --scene night-lantern --scene sunset-water --scene cave --scene distant-lod \
-  --scene rain-coast --scene trial-stair-hall --scene trial-spawner \
+  --scene rain-coast --scene trial-atrium --scene trial-stair-hall --scene trial-spawner \
   --scene trial-vault --scene trial-copper
 ```
 

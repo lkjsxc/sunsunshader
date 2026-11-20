@@ -27,6 +27,10 @@ Afternoon rain and mist over the sea and a sandy shore.
 
 ## Trial chambers
 
+[![Copper stairs rise through the generated trial-chamber atrium](media/rc5/trial-atrium-thumb.jpg)](media/rc5/trial-atrium.jpg)
+
+Copper stairs rise through the generated trial-chamber atrium.
+
 [![Tuff-brick trial-chamber stair hall with copper stairs on both sides and a lit copper bulb between them](media/rc5/trial-stair-hall-thumb.jpg)](media/rc5/trial-stair-hall.jpg)
 
 Tuff-brick trial-chamber stair hall with copper stairs on both sides and a lit copper bulb between them.
