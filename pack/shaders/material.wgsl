@@ -1,5 +1,14 @@
 // SPDX-License-Identifier: Apache-2.0
 
+fn ss_haze_inward_cage_face(position: vec3<f32>, normal: vec3<f32>) -> bool {
+    if !any(abs(normal) == vec3<f32>(1.0)) { return false; }
+    // The trial cage's inner shell sits 0.002 / 16 blocks inward from
+    // each integer plane and faces into the cage. The outer shell is flush.
+    let relative = position + fract(frame.camera_position);
+    let inset = dot(relative - round(relative), normal);
+    return abs(inset - 0.002 / 16.0) < 1.0 / 16384.0;
+}
+
 fn material(input: MaterialInput) -> Surface {
     if input.fluid == 1u {
         return sunsun_water(input);
@@ -55,7 +64,8 @@ fn material(input: MaterialInput) -> Surface {
     }
     if !input.translucent {
         // Reserved native-B codec; the actual wet lighting above stays unchanged.
-        set_surface(normal, ss_haze_encode_receiver(input.light.x), ss_surface_data(input.light, emission, sources));
+        let inward = (input.tags & 8u) != 0u && ss_haze_inward_cage_face(input.position, normal);
+        set_surface(normal, ss_haze_encode_receiver(input.light.x, inward), ss_surface_data(input.light, emission, sources));
     }
     // Engine coverage keeps the native cutout test; translucent alpha stays coverage.
     // Keep rc3's texture/tint coverage expression without changing geometry.

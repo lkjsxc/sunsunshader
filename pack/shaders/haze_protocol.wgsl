@@ -127,8 +127,10 @@ fn ss_haze_e_witness_unambiguous(p: vec3<f32>, normal: vec3<f32>, camera: SsHaze
     return !any(select(vec3<bool>(false), near_edge, tangent));
 }
 
-fn ss_haze_e_key(p: vec3<f32>, normal: vec3<f32>, camera: SsHazeCamera) -> vec3<i32> {
-    return camera.integer + vec3<i32>(floor(camera.fraction + p - normal * (1.0 / 1024.0)));
+fn ss_haze_e_key(p: vec3<f32>, normal: vec3<f32>, inward: bool, camera: SsHazeCamera) -> vec3<i32> {
+    // Bias toward the block that owns the observed face.
+    let bias = select(1.0 / 1024.0, -1.0 / 1024.0, inward);
+    return camera.integer + vec3<i32>(floor(camera.fraction + p - normal * bias));
 }
 
 fn ss_haze_key_equal(stored: vec3<u32>, expected: vec3<i32>) -> bool {

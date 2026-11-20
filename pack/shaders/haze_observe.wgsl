@@ -31,7 +31,7 @@ fn compute(input: ComputeInput) {
     let colour = clamp(ss_metadata_source_colour(surface.data), vec3<f32>(0.0), vec3<f32>(1.0));
     let level = u32(round(clamp(ss_metadata_emission(surface.data), 0.0, 1.0) * 15.0));
     if level > 0u && ss_haze_e_witness_unambiguous(position, surface.normal, camera) {
-        let key = ss_haze_e_key(position, surface.normal, camera);
+        let key = ss_haze_e_key(position, surface.normal, receiver.inward, camera);
         if ss_haze_active_e(key, camera) {
             let base = ss_haze_e_accum(key);
             if ss_haze_accum_key(base, key) {

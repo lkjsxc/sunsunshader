@@ -19,7 +19,7 @@ fn ss_haze_negative_witness(key: vec3<i32>, offset: vec3<f32>, packed_normal: u3
     let point = view_position(pixel_uv, depth);
     if !ss_haze_local_position_valid(point) { return false; }
     if !ss_haze_e_witness_unambiguous(point, surface.normal, camera)
-        || !all(ss_haze_e_key(point, surface.normal, camera) == key) { return false; }
+        || !all(ss_haze_e_key(point, surface.normal, decoded.inward, camera) == key) { return false; }
     // Both point and witness are camera-relative world coordinates.
     return distance(point, witness) <= 1.0 / 32.0
         && dot(surface.normal, ss_haze_unpack_normal(packed_normal)) >= 0.99;
@@ -70,7 +70,8 @@ fn ss_haze_resolve_emitter(key: vec3<i32>, camera: SsHazeCamera, elapsed: f32,
                     let point = view_position(uv, max(depth, 0.0000001));
                     let sample_level = u32(round(ss_metadata_emission(surface.data) * 15.0));
                     if decoded.valid && depth > 0.0000001 && ss_haze_local_position_valid(point)
-                        && all(ss_haze_e_key(point, surface.normal, camera) == key) && sample_level == minimum {
+                        && all(ss_haze_e_key(point, surface.normal, decoded.inward, camera) == key)
+                        && sample_level == minimum {
                         let denominator = max(f32(count) * f32(ss_light_accum[11u]), 1.0);
                         let tint = clamp(vec3<f32>(f32(ss_light_accum[accum + 4u]),
                             f32(ss_light_accum[accum + 5u]), f32(ss_light_accum[accum + 6u])) / denominator,

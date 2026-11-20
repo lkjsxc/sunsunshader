@@ -219,6 +219,11 @@ sprites = ["block/*_ore"]
 id = "rc3_non_emitting_lichen"
 sprites = ["block/glow_lichen"]
 
+# Tag mask 8u (index 3) identifies the trial cage's model sprites.
+[[tags]]
+id = "trial_spawner_cage"
+sprites = ["block/trial_spawner_*"]
+
 [[lights]]
 color = [1.0, 0.64, 0.32]
 blocks = ["torch", "wall_torch", "lantern", "campfire", "*candle*", "jack_o_lantern"]
