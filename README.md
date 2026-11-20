@@ -181,3 +181,7 @@ maintenance.
 
 All shader code is original and Apache-2.0 licensed. Published mathematical
 methods are credited in source comments; no other shader pack is used as source.
+
+[Bliss Shaders](https://github.com/X0nk/Bliss-Shader) by Xonk was an early
+visual reference for Sunsun. Bliss adapts Chocapic13's V9 shaders and carries
+its own [license](https://github.com/X0nk/Bliss-Shader/blob/Stable/LICENSE.md).
