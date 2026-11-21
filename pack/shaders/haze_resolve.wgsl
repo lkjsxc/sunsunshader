@@ -129,6 +129,7 @@ fn ss_haze_resolve_emitter(key: vec3<i32>, camera: SsHazeCamera, elapsed: f32,
 }
 
 fn compute(input: ComputeInput) {
+    if !local_haze || quality == 0u { return; }
     if !input.in_bounds { return; }
     let camera = ss_haze_camera();
     let key = camera.origin + vec3<i32>(input.cell);

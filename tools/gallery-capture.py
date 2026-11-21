@@ -7,6 +7,7 @@ import math
 import os
 from pathlib import Path
 import re
+import select
 import shutil
 import signal
 import struct
@@ -15,6 +16,8 @@ import sys
 import tempfile
 import time
 from datetime import UTC, datetime
+
+import gallery_timing as timing
 
 HERE = Path(__file__).resolve().parent
 CATALOGUE = HERE / "gallery-scenes.json"
@@ -57,7 +60,7 @@ def stop_group(proc):
 def idle_guard(path):
     env = os.environ.copy()
     env.update(XDG_RUNTIME_DIR=f"/run/user/{os.getuid()}", WAYLAND_DISPLAY="wayland-1")
-    return subprocess.Popen([path], stdin=subprocess.DEVNULL, env=env)
+    return subprocess.Popen([path, "--watch"], stdin=subprocess.PIPE, stdout=subprocess.PIPE, bufsize=0, env=env)
 
 
 def remaining(deadline):
@@ -74,9 +77,9 @@ def supervise(args, work, env, width, height):
             if remaining(args.deadline) < 40:
                 raise RuntimeError("Too close to the GPU handback to start")
             guard = idle_guard(args.idle_guard)
-            if guard.wait(timeout=18):
+            ready, _, _ = select.select([guard.stdout], [], [], 18)
+            if not ready or guard.stdout.read(1) != b"R" or guard.poll() is not None:
                 raise RuntimeError("The CachyOS Wayland seat did not confirm 15 seconds of input inactivity")
-            guard = idle_guard(args.idle_guard)
             display = [
                 "gamescope", "--backend", "headless", "--expose-wayland",
                 "--force-composition", "-w", str(width), "-h", str(height),
@@ -92,6 +95,8 @@ def supervise(args, work, env, width, height):
             "--worker", str(work),
         ]
         with (args.output / "display.log").open("w") as log:
+            if guard is not None and guard.poll() is not None:
+                raise RuntimeError("The CachyOS Wayland input watch stopped before capture")
             renderer = subprocess.Popen(
                 command, env=env, stdout=log, stderr=subprocess.STDOUT,
                 stdin=subprocess.DEVNULL, start_new_session=True,
@@ -100,17 +105,35 @@ def supervise(args, work, env, width, height):
                 if remaining(args.deadline) < 20:
                     raise RuntimeError("GPU handback reached")
                 if guard is not None and guard.poll() is not None:
-                    if guard.returncode:
-                        raise RuntimeError("The CachyOS Wayland seat stopped confirming inactivity")
-                    guard = idle_guard(args.idle_guard)
+                    raise RuntimeError("The CachyOS Wayland input watch stopped during capture")
                 time.sleep(0.25)
+        if guard is not None:
+            if guard.poll() is not None:
+                raise RuntimeError("The CachyOS Wayland input watch stopped before capture completion")
+            try:
+                if guard.stdin.write(b"F") != 1:
+                    raise BrokenPipeError("Could not send finish marker")
+                status = guard.wait(timeout=5)
+            except (BrokenPipeError, subprocess.TimeoutExpired) as error:
+                raise RuntimeError("The CachyOS Wayland input watch could not confirm capture completion") from error
+            if status:
+                raise RuntimeError("The CachyOS Wayland input watch refused capture completion")
         if renderer.returncode or not (args.output / "complete.json").exists():
             raise RuntimeError(f"Capture stopped. See {args.output / 'display.log'}")
     finally:
-        if guard is not None and guard.poll() is None:
-            guard.terminate()
-            guard.wait(timeout=5)
-        stop_group(renderer)
+        try:
+            stop_group(renderer)
+        finally:
+            if guard is not None:
+                if guard.poll() is None:
+                    guard.terminate()
+                    try:
+                        guard.wait(timeout=5)
+                    except subprocess.TimeoutExpired:
+                        guard.kill()
+                        guard.wait()
+                guard.stdin.close()
+                guard.stdout.close()
 
 
 def check_sdr_png(path, size):
@@ -154,20 +177,103 @@ def verify_pose(scene, state, status, world, detail, lod, size, backend):
         raise ValueError(f"Scene state diverged for {scene['id']}")
 
 
-def bench_gpu(ctl, output, scene, renderer):
-    ctl("options-set", "maxFps", 260)
-    enabled = ctl("gpu-passes", "on")
+def graphics_text(lod, picked):
+    """Both arms write these exact lines; a stock arm leaves `pickedShaderPack:` empty."""
+    return (f"workers:4\nlodDistance:{lod}\nhdr:false\n"
+            f"resolutionScale:100\ndynamicResolution:false\ntaa:false\nfxaa:false\nframeGeneration:off\n"
+            f"shadowCache:false\npickedShaderPack:{picked}\n")
+
+
+def shaderpack_listing(directory):
+    """Every entry under shaderpacks/, hidden ones included; None when it is absent or a link."""
+    if directory.is_symlink() or not directory.is_dir():
+        return None
+    entries = []
+    for root, dirs, files in os.walk(directory):
+        base = Path(root).relative_to(directory)
+        entries += [(base / name).as_posix() + "/" for name in dirs]
+        entries += [(base / name).as_posix() for name in files]
+    return sorted(entries)
+
+
+def step_world(ctl, count):
+    """Advance a frozen private fixture exactly; loading waits must not set its phase."""
+    start = ctl("simulation")["game_time"]
+    ctl("command", f"tick step {count}")
+    deadline = time.monotonic() + count / 20 + 30
+    while True:
+        current = ctl("simulation")["game_time"]
+        if current == start + count:
+            return
+        if current > start + count or time.monotonic() >= deadline:
+            raise RuntimeError("Frozen fixture did not advance by the exact requested tick count")
+        ctl("wait", 5)
+
+
+def bench_gpu(ctl, args, scene, installed_pack, options_file):
+    """Retain the native reply unchanged, with observations bracketing the sample."""
+    inputs = timing.read_json(args.output / "inputs.json")
+    sample = {"warmup_seconds": args.timing_warmup, "seconds": args.timing_seconds}
+    result = {"schema": 1, "kind": "sunsun-native-timing", "bench_format": timing.FORMAT,
+              "inputs_sha256": sha256(args.output / "inputs.json"), "scene": scene, "sample": sample}
+
+    expected = timing.STOCK_ADMISSION if args.stock else {"kind": "native", "name": str(installed_pack)}
+
+    def admission(when):
+        path = args.output / f"{scene['id']}.timing-{when}.png"
+        reply = ctl("screenshot-sequence", 1, 100, path)
+        if reply.get("pack") != expected:
+            raise RuntimeError(f"{'Stock (no pack)' if args.stock else 'Native pack'} activation not verified {when} timing")
+        check_sdr_png(path, inputs["size"])
+        return reply
+
+    def observe(active):
+        observed = {"state": ctl("state"), "status": ctl("status"),
+                    "world_game_time": ctl("simulation")["game_time"],
+                    "options": ctl("options-get", *timing.OPTION_KEYS), "admission": active,
+                    "installed_pack": None, "installed_pack_sha256": None, "pack_options": None, "blocks": []}
+        if not args.stock:
+            observed.update(installed_pack=str(installed_pack), installed_pack_sha256=sha256(installed_pack),
+                            pack_options={})
+            for line in options_file.read_text().splitlines():
+                key, value = line.split("=", 1)
+                if key in observed["pack_options"]:
+                    raise ValueError("Duplicate installed shader option")
+                observed["pack_options"][key] = float(value)
+        for block in scene.get("check_blocks", []):
+            reply = ctl("block", *block["position"])
+            if not reply["loaded"] or reply["state"] != block["state"]:
+                raise ValueError(f"Fixture block changed at {block['position']}")
+            observed["blocks"].append({"position": block["position"], "state": reply["state"]})
+        return observed
+
     try:
-        time.sleep(3)
-        result = ctl("bench", 8, "raw", timeout=30)
+        active = admission("before")
+        ctl("options-set", "maxFps", 260)  # The pinned client's unlimited slider setting.
+        ctl("options-set", "enableVsync", "false")
+        ctl("options-set", "inactivityFpsLimit", "minimized")
+        result["reset"] = ctl("gpu-passes", "off")
+        ctl("wait", 2)  # bench resets FrameStats, but does not clear the pass timers.
+        result["reset_wait_frames"] = 2
+        result["enable"] = ctl("gpu-passes", "on")
+        time.sleep(args.timing_warmup)
+        result["before"] = observe(active)
+        timing.snapshot_key(result["before"], scene, inputs)
+        result["conditions_before"] = timing.conditions()
+        result["started_at"] = datetime.now(UTC).isoformat()
+        result["benchmark"] = ctl("bench", args.timing_seconds, "raw", timeout=args.timing_seconds + 30)
+        result["finished_at"] = datetime.now(UTC).isoformat()
+        result["conditions_after"] = timing.conditions()
+        result["after"] = observe(active)
+        result["after"]["admission"] = admission("after")
     finally:
-        disabled = ctl("gpu-passes", "off")
-        ctl("options-set", "maxFps", 60)
-    record(output / f"{scene}.timing.json", {
-        "scene": scene, "renderer": renderer, "warmup_seconds": 3, "sample_seconds": 8,
-        "format": "SDR", "profile": "Medium", "enable": enabled, "disable": disabled,
-        "benchmark": result, "per_pass_available": bool(result.get("gpu_passes") and result.get("shader_passes")),
-    })
+        # Even a failed activation/state check keeps any raw benchmark already returned.
+        try:
+            result["disable"] = ctl("gpu-passes", "off")
+            ctl("options-set", "maxFps", 60)
+        finally:
+            record(args.output / f"{scene['id']}.timing.json", result)
+    timing.validate_record(result, inputs, scene, sample)
 
 
 def capture_group(args, pin, cfg, scenes, detail, lod, size):
@@ -175,18 +281,24 @@ def capture_group(args, pin, cfg, scenes, detail, lod, size):
     pack_dir = game / "shaderpacks"
     pack_dir.mkdir(parents=True)
     pack = pin["pack"]
-    installed_pack = pack_dir / f"{pack['id']}.hshader"
-    shutil.copyfile(args.pack, installed_pack)
-    verify(installed_pack, pack["sha256"])
-    opts = pack_dir / ".horizon-options"
-    opts.mkdir()
-    (opts / f"{pack['id']}.txt").write_text("quality=1\n")
+    if args.stock:
+        # Stock Horizon: an existing, empty shaderpacks/ and no picked pack; nothing else differs.
+        installed_pack = options_file = None
+        picked = timing.STOCK_STAGING["picked_shader_pack"]
+    else:
+        installed_pack = pack_dir / f"{pack['id']}.hshader"
+        shutil.copyfile(args.pack, installed_pack)
+        verify(installed_pack, pack["sha256"])
+        opts = pack_dir / ".horizon-options"
+        opts.mkdir()
+        options_file = opts / f"{pack['id']}.txt"
+        options_file.write_text("".join(f"{key}={value}\n" for key, value in sorted(args.pack_options.items())))
+        picked = f"horizon:{pack['id']}"
     (game / "options.txt").write_text("chunkSectionFadeInTime:0.0\n")
-    (game / "horizon-graphics.txt").write_text(
-        f"workers:4\nlodDistance:{lod}\nhdr:false\n"
-        f"resolutionScale:100\ndynamicResolution:false\ntaa:false\nframeGeneration:off\n"
-        f"shadowCache:false\npickedShaderPack:horizon:{pack['id']}\n"
-    )
+    (game / "horizon-graphics.txt").write_text(graphics_text(lod, picked))
+    launched = shaderpack_listing(pack_dir)
+    if args.stock and launched != timing.STOCK_STAGING["shaderpacks"]:
+        raise RuntimeError(f"Stock shaderpacks/ is not empty at launch: {launched}")
     # Keep the socket path short and owned. The compositor and renderer share this run's group.
     socket = args.worker / f"ctl-{detail}-{lod}.sock"
     resources = args.worker / "resources"
@@ -248,17 +360,24 @@ def capture_group(args, pin, cfg, scenes, detail, lod, size):
             previous_weather = "clear"
             for scene in scenes:
                 print(f"Capturing {scene['id']}", flush=True)
-                ctl("command", "tick unfreeze")
+                ctl("command", "tick freeze" if args.timing_scene else "tick unfreeze")
                 ctl("tp", *scene["position"])
                 ctl("look", *scene["look"])
-                ctl("wait", 40)
+                if args.timing_scene:
+                    step_world(ctl, 40)
+                else:
+                    ctl("wait", 40)
                 ctl("wait-ready", 120, timeout=130)
                 ctl("command", "kill @e[type=!minecraft:player]")
                 for command in cfg["setup"].get(scene.get("setup"), []):
                     ctl("command", command)
                 ctl("time", scene["time"])
                 ctl("command", "weather " + scene["weather"])
-                ctl("wait", 120 if scene["weather"] != previous_weather or scene["weather"] == "rain" else 40)
+                settle = 120 if scene["weather"] != previous_weather or scene["weather"] == "rain" else 40
+                if args.timing_scene:
+                    step_world(ctl, settle)
+                else:
+                    ctl("wait", settle)
                 previous_weather = scene["weather"]
                 ctl("wait-ready", 120, timeout=130)
                 ctl("command", "tick freeze")
@@ -277,7 +396,9 @@ def capture_group(args, pin, cfg, scenes, detail, lod, size):
                 record(args.output / f"{scene['id']}.state.json", {"state": state, "status": status})
                 verify_pose(scene, state, status, cfg["world"], detail, lod, size, args.backend)
                 path = args.output / f"{scene['id']}.png"
-                admission = {"kind": "native", "name": str(installed_pack)}
+                admission = dict(timing.STOCK_ADMISSION if args.stock else {"kind": "native", "name": str(installed_pack)})
+                if lod and args.stock:
+                    raise RuntimeError("The client log cannot prove that no pack is active with LOD")
                 if lod:
                     label = f"shader pack {pack['id']} {pack['version']}:"
                     if label not in log_path.read_text(errors="replace"):
@@ -294,8 +415,8 @@ def capture_group(args, pin, cfg, scenes, detail, lod, size):
                     "receipt": receipt, "admission": admission,
                     "sha256": sha256(path), "size": size, "format": "SDR",
                 })
-                if scene["id"] == args.timing_scene:
-                    bench_gpu(ctl, args.output, scene["id"], status["renderer"])
+                if scene["id"] in args.timing_scene:
+                    bench_gpu(ctl, args, scene, installed_pack, options_file)
             ctl("quit", timeout=20)
             if client.wait(timeout=20):
                 raise RuntimeError(f"Client quit with status {client.returncode}")
@@ -307,11 +428,19 @@ def capture_group(args, pin, cfg, scenes, detail, lod, size):
                 except subprocess.TimeoutExpired:
                     client.kill()
                     client.wait()
+    # The parent copies these launch and quit listings into cleanup.json.
+    staging = args.output / "staging.json"
+    groups = timing.read_json(staging)["groups"] if staging.exists() else []
+    quit_listing = shaderpack_listing(pack_dir)
+    record(staging, {"groups": [*groups, {"full_detail_chunks": detail, "lod_chunks": lod,
+                                          "launch": launched, "quit": quit_listing}]})
+    if args.stock and quit_listing != timing.STOCK_STAGING["shaderpacks"]:
+        raise RuntimeError(f"Stock shaderpacks/ is not empty after quit: {quit_listing}")
 
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--pack", required=True, type=Path)
+    parser.add_argument("--pack", type=Path, help="The pinned archive; omit it for a stock arm pin")
     parser.add_argument("--bin", required=True, type=Path, help="Verified Nightly binary directory")
     parser.add_argument("--pin", type=Path, default=DEFAULT_PIN, help="Input pin generated by gallery-pin.py")
     parser.add_argument("--resources", required=True, type=Path, help="Resources prepared for the pinned Horizon build")
@@ -322,8 +451,11 @@ def main():
     parser.add_argument("--deadline", type=datetime.fromisoformat, help="GPU handback as an ISO 8601 timestamp with offset")
     parser.add_argument("--scene", action="append", help="Capture only this catalogue scene (repeatable)")
     parser.add_argument("--catalogue", type=Path, default=CATALOGUE, help="Use a generated scouting catalogue")
+    parser.add_argument("--profile", choices=timing.PROFILES, help="Override the catalogue quality preset")
     parser.add_argument("--scout", action="store_true", help="Use the smaller scouting output size")
-    parser.add_argument("--timing-scene", help="Take one optional raw per-pass sample during a full GPU run")
+    parser.add_argument("--timing-scene", action="append", default=[], help="Take a native timing sample in this selected scene (repeatable)")
+    parser.add_argument("--timing-warmup", type=float, default=10, help="Seconds to warm each scene after resetting pass history")
+    parser.add_argument("--timing-seconds", type=float, default=8, help="Seconds of native raw frame data per scene")
     parser.add_argument("--worker", type=Path, help=argparse.SUPPRESS)
     args = parser.parse_args()
     if args.backend == "gamescope" and (args.deadline is None or args.deadline.utcoffset() is None):
@@ -333,12 +465,25 @@ def main():
     args.catalogue = args.catalogue.resolve()
     args.pin = args.pin.resolve()
     pin = json.loads(args.pin.read_text())
-    if pin.get("schema") != 1 or pin["pack"]["id"] != "sunsunshader":
+    try:
+        args.stock = timing.is_stock(pin)
+        if args.stock:
+            timing.check_pin(pin)
+    except (timing.Invalid, KeyError, TypeError) as error:
+        parser.error(f"invalid stock arm pin: {error}")
+    if not args.stock and (pin.get("schema") != 1 or not isinstance(pin.get("pack"), dict)
+                           or pin["pack"].get("id") != "sunsunshader"):
         parser.error("expected a Sunsun Shader gallery input pin")
+    if args.stock != (args.pack is None):
+        parser.error("a stock arm pin takes no --pack; a pack pin requires --pack")
+    if args.stock and args.profile:
+        parser.error("a stock arm has no shader pack preset; omit --profile")
     cfg = json.loads(args.catalogue.read_text())
+    if args.profile:
+        cfg["profile"] = args.profile
     scene_ids = [scene["id"] for scene in cfg["scenes"]]
     if (
-        cfg.get("schema") != 1 or cfg["profile"] != "Medium"
+        cfg.get("schema") != 1 or cfg["profile"] not in timing.PROFILES
         or not re.fullmatch(r"[A-Za-z][A-Za-z0-9_-]*", cfg["world"])
         or not scene_ids or len(scene_ids) != len(set(scene_ids))
         or not all(re.fullmatch(r"[a-z0-9]+(?:-[a-z0-9]+)*", value) for value in scene_ids)
@@ -350,40 +495,79 @@ def main():
     size = cfg["scout_size" if args.scout else "capture_size"]
     if args.timing_scene and (
         args.backend != "gamescope" or size != [1920, 1080]
-        or args.timing_scene not in {scene["id"] for scene in scenes}
+        or not set(args.timing_scene) <= {scene["id"] for scene in scenes}
+        or len(args.timing_scene) != len(set(args.timing_scene))
+        or not 3 <= args.timing_warmup <= 300 or not 1 <= args.timing_seconds <= 60
     ):
         parser.error("--timing-scene requires a selected scene in a 1080p Gamescope capture")
+    if any(scene.get("lod_chunks", 0) and scene["id"] in args.timing_scene for scene in scenes):
+        parser.error("timing activation proof is unavailable for LOD in this pin; select near scenes")
+    if args.stock and any(scene.get("lod_chunks", 0) for scene in scenes):
+        parser.error("no-pack activation proof is unavailable for LOD in this pin; select near scenes")
     for field in ("pack", "bin", "resources", "output"):
-        setattr(args, field, getattr(args, field).resolve())
+        if getattr(args, field) is not None:
+            setattr(args, field, getattr(args, field).resolve())
+    if args.stock:
+        contract = {"pack_options": None, "expected_shader_passes": None}
+    elif args.timing_scene:
+        contract = timing.pack_contract(args.pack, pin, cfg["profile"])
+    else:
+        contract = {"pack_options": {"quality": timing.PROFILES.index(cfg["profile"])}, "expected_shader_passes": []}
+    args.pack_options = contract["pack_options"]
 
     if args.worker:
+        for name in BINARIES:
+            verify(args.bin / name, pin["horizon"]["binaries"][name])
         # Horizon may update its decoded sprite cache under the resource root.
         shutil.copytree(args.resources, args.worker / "resources")
+        if args.timing_scene:
+            inputs = timing.read_json(args.output / "inputs.json")
+            if (inputs["pack"] != pin["pack"] or inputs["horizon"] != pin["horizon"]
+                    or inputs["pin_sha256"] != sha256(args.pin)
+                    or inputs["catalogue_sha256"] != sha256(args.catalogue)
+                    or inputs["capture_tool_sha256"] != sha256(Path(__file__))
+                    or inputs["timing_tool_sha256"] != sha256(Path(timing.__file__))):
+                raise ValueError("Capture code or pinned inputs changed before worker startup")
+            if timing.resource_digest(args.worker / "resources") != inputs["resource_sha256"]:
+                raise ValueError("Prepared resources changed during the private copy")
         groups = {}
         for scene in scenes:
             key = (scene.get("full_detail_chunks", cfg["full_detail_chunks"]), scene.get("lod_chunks", 0))
             groups.setdefault(key, []).append(scene)
         for (detail, lod), group in groups.items():
             capture_group(args, pin, cfg, group, detail, lod, size)
-        record(args.output / "complete.json", {"scenes": [scene["id"] for scene in scenes]})
+        record(args.output / "complete.json", {
+            "scenes": [scene["id"] for scene in scenes], "inputs_sha256": sha256(args.output / "inputs.json"),
+            "timings": {scene: sha256(args.output / f"{scene}.timing.json") for scene in args.timing_scene},
+        })
         return
 
     if (HERE.parent / ".git").exists() and args.output.is_relative_to(HERE.parent):
         if not args.output.is_relative_to(HERE.parent / ".build"):
             parser.error("Keep capture output under .build/ or outside this repository")
-    verify(args.pack, pin["pack"]["sha256"])
+    if not args.stock:
+        verify(args.pack, pin["pack"]["sha256"])
     for name in BINARIES:
         verify(args.bin / name, pin["horizon"]["binaries"][name])
     if not args.resources.is_dir():
         parser.error("--resources must point to a prepared resource directory")
     args.output.mkdir(mode=0o700, parents=True)
     record(args.output / "inputs.json", {
+        "schema": 2, "kind": "sunsun-gallery-inputs", "pack": pin["pack"], "horizon": pin["horizon"],
+        "resource_sha256": timing.resource_digest(args.resources) if args.timing_scene else None,
+        "capture_tool_sha256": sha256(Path(__file__)), "timing_tool_sha256": sha256(Path(timing.__file__)),
+        **({"arm": "stock", "staging": timing.STOCK_STAGING} if args.stock else {}),
+        "profile": None if args.stock else cfg["profile"], **contract, "world": cfg["world"], "fov": cfg.get("fov", 70),
+        "full_detail_chunks": cfg["full_detail_chunks"], "machine": timing.machine_identity(),
+        "graphics": timing.GRAPHICS,
         "nightly": pin["horizon"]["nightly"], "binaries": pin["horizon"]["binaries"],
-        "pack_sha256": pin["pack"]["sha256"], "pack_version": pin["pack"]["version"],
+        "pack_sha256": None if args.stock else pin["pack"]["sha256"],
+        "pack_version": None if args.stock else pin["pack"]["version"],
         "horizon_archive_sha256": pin["horizon"]["archive_sha256"],
         "pin_sha256": sha256(args.pin),
         "catalogue_sha256": sha256(args.catalogue), "seed": cfg["seed"],
         "size": size, "format": "SDR", "backend": args.backend,
+        "render_mode": "offscreen",
     })
     try:
         with tempfile.TemporaryDirectory(prefix="sunsun-gallery-", dir="/tmp") as directory:
@@ -400,18 +584,20 @@ def main():
                 OMP_NUM_THREADS="4", LP_NUM_THREADS="4",
             )
             supervise(args, work, env, *size)
+        staging = timing.read_json(args.output / "staging.json")["groups"]
     except BaseException as error:
         record(args.output / "cleanup.json", {"completed": False, "reason": str(error) or "Capture interrupted"})
         raise
-    record(args.output / "cleanup.json", {"completed": True, "temporary_game_removed": True})
+    record(args.output / "cleanup.json", {"completed": True, "temporary_game_removed": True, "staging": staging})
 
 
 def interrupted(_signum, _frame):
-    raise KeyboardInterrupt
+    timing.interrupted(_signum, _frame)
 
 
 if __name__ == "__main__":
     signal.signal(signal.SIGTERM, interrupted)
+    signal.signal(signal.SIGINT, interrupted)
     try:
         main()
     except (KeyboardInterrupt, KeyError, OSError, RuntimeError, ValueError, subprocess.SubprocessError) as error:

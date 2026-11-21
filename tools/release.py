@@ -21,6 +21,7 @@ import zipfile
 
 ROOT = Path(__file__).resolve().parents[1]
 PIN_FILE = ROOT / "compatibility/horizon.json"
+PACK = ROOT / "pack"
 
 
 class Refused(RuntimeError):
@@ -40,17 +41,16 @@ def digest(path):
     return hashlib.sha256(Path(path).read_bytes()).hexdigest()
 
 
-def pins():
+def nightly_pin():
     data = json.loads(PIN_FILE.read_text())
     if data.get("schema") != 1:
         raise Refused("Unsupported compatibility pin schema")
-    targets = data["targets"]
-    nightly = targets["nightly"]
+    nightly = data["nightly"]
     if not nightly.get("tag", "").startswith("nightly-source/"):
         raise Refused("The release target must pin a public nightly-source tag, not development main")
     if not nightly.get("admission_source"):
         raise Refused("The release target must record its reviewed ordinary-game admission source")
-    return targets
+    return nightly
 
 
 def clean_source(path):
@@ -59,40 +59,46 @@ def clean_source(path):
         raise Refused(f"Horizon source must be unmodified: {path}\n{state}")
 
 
-def validator(target, pin):
-    override = os.environ.get(f"SUNSUN_{target.upper()}_SOURCE")
-    source = Path(override).resolve() if override else ROOT / ".build" / f"horizon-{target}"
+def verified_source(pin):
+    override = os.environ.get("SUNSUN_NIGHTLY_SOURCE")
+    source = Path(override).resolve() if override else ROOT / ".build/horizon-nightly"
     if not (source / ".git").exists():
         if override:
             raise Refused(f"Configured Horizon source is not a Git checkout: {source}")
         source.mkdir(parents=True, exist_ok=True)
         run(["git", "init", "--quiet", source])
         run(["git", "remote", "add", "origin", pin["repository"]], cwd=source)
-        ref = f"refs/tags/{pin['tag']}:refs/tags/{pin['tag']}" if pin.get("tag") else pin["revision"]
+        ref = f"refs/tags/{pin['tag']}:refs/tags/{pin['tag']}"
         run(["git", "fetch", "--depth", "1", "origin", ref], cwd=source)
         run(["git", "checkout", "--quiet", "--detach", "FETCH_HEAD"], cwd=source)
     clean_source(source)
     actual = run(["git", "rev-parse", "HEAD"], cwd=source, capture=True)
     if actual != pin["revision"]:
-        raise Refused(f"Wrong Horizon source for {target}: {actual}; expected {pin['revision']}. "
+        raise Refused(f"Wrong Horizon Nightly source: {actual}; expected {pin['revision']}. "
                       "Use a fresh checkout when moving the pin.")
-    if pin.get("tag"):
-        tagged = run(["git", "rev-parse", f"refs/tags/{pin['tag']}^{{commit}}"], cwd=source, capture=True)
-        if tagged != actual:
-            raise Refused("Nightly source tag does not match its pinned commit")
-    policy = pin.get("admission_source")
-    if policy and digest(source / policy["path"]) != policy["sha256"]:
+    tagged = run(["git", "rev-parse", f"refs/tags/{pin['tag']}^{{commit}}"], cwd=source, capture=True)
+    if tagged != actual:
+        raise Refused("Nightly source tag does not match its pinned commit")
+    policy = pin["admission_source"]
+    if digest(source / policy["path"]) != policy["sha256"]:
         raise Refused("Nightly game admission source changed. Review its ordinary game rules and update the pin.")
+    return source
+
+
+def validator(pin):
+    source = verified_source(pin)
+    actual = pin["revision"]
+    target = ROOT / ".build/horizon-validator"
     env = os.environ.copy()
     env["CARGO_BUILD_JOBS"] = str(min(12, max(1, int(env.get("CARGO_BUILD_JOBS", "12")))))
     env["CARGO_INCREMENTAL"] = "0"
-    env["CARGO_TARGET_DIR"] = str(source / "target")
+    env["CARGO_TARGET_DIR"] = str(target)
     run(["cargo", "build", "--locked", "--profile", "fast", "--manifest-path", source / "Cargo.toml",
          "-p", "horizon-shader-api", "--bin", "horizon-shader"], cwd=source, env=env)
     clean_source(source)
     if run(["git", "rev-parse", "HEAD"], cwd=source, capture=True) != actual:
         raise Refused("Horizon source revision changed during the validator build")
-    return source / "target/fast/horizon-shader"
+    return target / "fast/horizon-shader"
 
 
 def manifest(archive):
@@ -126,7 +132,7 @@ def official_check(binary, archive):
     return reports[0]
 
 
-def check_archive(binary, archive, target, pin):
+def check_archive(binary, archive, pin):
     archive = Path(archive).resolve()
     if archive.suffix != ".hshader" or not archive.is_file():
         raise Refused("Check needs an existing .hshader file, not a source directory")
@@ -145,7 +151,7 @@ def check_archive(binary, archive, target, pin):
         "kind": "sunsunshader-compatibility-check",
         "scope": "Packed-file parser, shader validation and ordinary-game manifest admission; rendering is checked separately",
         "checked_at": datetime.now(timezone.utc).isoformat(),
-        "target": target,
+        "target": "nightly",
         "archive": {"file": archive.name, "sha256": before, "bytes": archive.stat().st_size},
         "horizon": pin,
         "validator_sha256": digest(binary),
@@ -163,6 +169,10 @@ def write_receipt(archive, receipt):
     return output
 
 
+def check_post_ir(pack):
+    return json.loads(run([sys.executable, ROOT / "tools/post_ir.py", "check", pack], capture=True))
+
+
 def alter_manifest(archive, output, change):
     with zipfile.ZipFile(archive) as old, zipfile.ZipFile(output, "w", zipfile.ZIP_DEFLATED) as new:
         for item in old.infolist():
@@ -172,63 +182,53 @@ def alter_manifest(archive, output, change):
             new.writestr(item, content)
 
 
-def self_test(binary, archive, target, pin):
+def self_test(binary, archive, pin):
     with tempfile.TemporaryDirectory(prefix="gate-test-", dir=Path(archive).parent) as scratch:
         bad = Path(scratch) / "unknown-field.hshader"
         alter_manifest(archive, bad, lambda text: "sunsun_unknown_compatibility_probe = true\n" + text)
         result = subprocess.run([str(binary), "check", str(bad), "--json"], text=True, capture_output=True)
         if result.returncode == 0 or "unknown field" not in result.stdout or "sunsun_unknown_compatibility_probe" not in result.stdout:
             raise Refused("Negative gate test failed: the released parser must reject unknown manifest fields")
-        if target == "nightly" and pin["normal_game_api"] == "0.2":
+        if pin["normal_game_api"] == "0.2":
             obsolete = Path(scratch) / "obsolete-api.hshader"
             alter_manifest(archive, obsolete, lambda text: text.replace('api = "0.2"', 'api = "0.1"', 1))
             result = subprocess.run([str(binary), "check", str(obsolete), "--json"], text=True, capture_output=True)
             if result.returncode == 0 or "needs shader API 0.1" not in result.stdout:
                 raise Refused("Negative gate test failed: the released parser must reject obsolete API 0.1")
             wide_gamut = manifest(archive)
-            wide_gamut["frame"] = {"primaries": "bt2020"}
+            wide_gamut.setdefault("frame", {})["primaries"] = "bt2020"
             for forbidden in (wide_gamut, {**manifest(archive), "motion": {}}):
                 try:
                     normal_game_admission(forbidden, pin)
                 except Refused:
                     continue
                 raise Refused("Negative gate test failed: ordinary API 0.2 game accepted an unsupported option")
-        if target == "nightly" and pin["normal_game_api"] == "0.1":
-            experimental = Path(scratch) / "experimental-api.hshader"
-            alter_manifest(archive, experimental, lambda text: text.replace('api = "0.1"', 'api = "0.2"', 1))
-            official_check(binary, experimental)
-            try:
-                normal_game_admission(manifest(experimental), pin)
-            except Refused:
-                pass
-            else:
-                raise Refused("Negative gate test failed: experimental API 0.2 passed normal Nightly admission")
-        print(f"{target}: negative packed-file admission checks passed", flush=True)
+        print("Nightly: negative packed-file admission checks passed", flush=True)
 
 
-def archive_name(data, target):
-    suffix = "" if target == "nightly" else "-main"
-    return f"sunsunshader-{data['version']}{suffix}.hshader"
+def archive_name(data):
+    return f"sunsunshader-{data['version']}.hshader"
 
 
-def build(target, pin, out_dir, test):
-    binary = validator(target, pin)
-    pack = ROOT / pin["pack_directory"]
-    data = tomllib.loads((pack / "horizon-shaders.toml").read_text())
+def build(pin, out_dir, test):
+    data = tomllib.loads((PACK / "horizon-shaders.toml").read_text())
     normal_game_admission(data, pin)
+    binary = validator(pin)
+    ir = check_post_ir(PACK)
     out_dir.mkdir(parents=True, exist_ok=True)
-    final = out_dir / archive_name(data, target)
+    final = out_dir / archive_name(data)
     with tempfile.TemporaryDirectory(prefix="package-", dir=out_dir) as scratch:
         candidate = Path(scratch) / final.name
-        run([binary, "pack", pack, "--out", candidate])
-        receipt = check_archive(binary, candidate, target, pin)
+        run([binary, "pack", PACK, "--out", candidate])
+        receipt = check_archive(binary, candidate, pin)
+        receipt["post_ir"] = ir
         if test:
-            self_test(binary, candidate, target, pin)
+            self_test(binary, candidate, pin)
         os.replace(candidate, final)
     # Packaging and checking are performed before the public output is replaced.
     receipt["official_report"]["path"] = str(final)
     write_receipt(final, receipt)
-    print(f"PASS {target}: {final} ({receipt['archive']['sha256']})", flush=True)
+    print(f"PASS nightly: {final} ({receipt['archive']['sha256']})", flush=True)
     return final
 
 
@@ -239,13 +239,14 @@ def publish(archive, notes, title, dry_run, pin, prerelease=False, latest=False)
     with tempfile.TemporaryDirectory(prefix="publish-", dir=staging) as scratch:
         snapshot = Path(scratch) / Path(archive).name
         shutil.copyfile(archive, snapshot)
-        binary = validator("nightly", pin)
-        receipt = check_archive(binary, snapshot, "nightly", pin)
+        binary = validator(pin)
+        receipt = check_archive(binary, snapshot, pin)
+        receipt["post_ir"] = check_post_ir(snapshot)
         data = manifest(snapshot)
-        if snapshot.name != archive_name(data, "nightly"):
+        if snapshot.name != archive_name(data):
             raise Refused("The release asset must have the versioned Nightly filename")
         rebuilt = Path(scratch) / "rebuilt.hshader"
-        run([binary, "pack", ROOT / pin["pack_directory"], "--out", rebuilt])
+        run([binary, "pack", PACK, "--out", rebuilt])
         if digest(rebuilt) != receipt["archive"]["sha256"]:
             raise Refused("Release archive differs from the current pack source; rebuild and repeat the game captures")
         dirty = run(["git", "status", "--porcelain", "--untracked-files=all"], cwd=ROOT, capture=True)
@@ -288,7 +289,6 @@ def main():
         command = commands.add_parser(name)
         if name == "check":
             command.add_argument("archive", nargs="?")
-        command.add_argument("--target", choices=["all", "nightly", "main"], default="all")
         command.add_argument("--out-dir", type=Path, default=ROOT / "dist")
         command.add_argument("--self-test", action="store_true")
     release = commands.add_parser("release")
@@ -301,25 +301,25 @@ def main():
     release_kind.add_argument("--latest", action="store_true",
                               help="Publish the build for the current public Nightly as GitHub Latest, even for an -rc version")
     args = parser.parse_args()
-    targets = pins()
+    pin = nightly_pin()
     if args.command == "release":
         if not args.notes.is_file():
             raise Refused("Release notes file does not exist")
-        publish(args.archive.resolve(), args.notes.resolve(), args.title, args.dry_run, targets["nightly"],
+        publish(args.archive.resolve(), args.notes.resolve(), args.title, args.dry_run, pin,
                 prerelease=args.prerelease, latest=args.latest)
     elif args.command == "check" and args.archive:
-        if args.target == "all":
-            raise Refused("Choose --target nightly or --target main when checking an existing archive")
-        binary = validator(args.target, targets[args.target])
+        binary = validator(pin)
         archive = Path(args.archive).resolve()
-        receipt = check_archive(binary, archive, args.target, targets[args.target])
+        receipt = check_archive(binary, archive, pin)
+        receipt["post_ir"] = check_post_ir(archive)
+        if digest(archive) != receipt["archive"]["sha256"]:
+            raise Refused("The archive changed during post IR validation")
         if args.self_test:
-            self_test(binary, archive, args.target, targets[args.target])
+            self_test(binary, archive, pin)
         write_receipt(archive, receipt)
-        print(f"PASS {args.target}: {archive} ({receipt['archive']['sha256']})")
+        print(f"PASS nightly: {archive} ({receipt['archive']['sha256']})")
     else:
-        for target in targets if args.target == "all" else [args.target]:
-            build(target, targets[target], args.out_dir.resolve(), args.self_test)
+        build(pin, args.out_dir.resolve(), args.self_test)
 
 
 if __name__ == "__main__":

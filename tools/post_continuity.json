@@ -1,0 +1,34 @@
+{
+  "schema": 1,
+  "stages": [
+    {
+      "kind": "post",
+      "file": "shaders/compose.wgsl",
+      "root": "post",
+      "proven": {
+        "ss_moving_picture_at": {
+          "file": "shaders/compose.wgsl",
+          "boundary": "compose: previous_clip.w = 0 and fade = 0 and 1 (finite stock camera envelope)",
+          "fingerprint": "8d45b06e1a44492fe8e69125c155527898faa94f09f5c4bcc38df9818c0f4608"
+        },
+        "ss_focus": {
+          "file": "shaders/focus.wgsl",
+          "boundary": "focus: blur = 0 and 1",
+          "fingerprint": "901f03f620dc868936e96a8b2d7616b91f325b52ab3523cf8eac0060dcf8c92a"
+        }
+      }
+    },
+    {
+      "kind": "tonemap",
+      "file": "shaders/display.wgsl",
+      "root": "tonemap",
+      "proven": {
+        "ss_edge_resolve": {
+          "file": "shaders/lens.wgsl",
+          "boundary": "lens: axis_mix = 0 and 1",
+          "fingerprint": "dd5968dbaf217b789146e065b733a227cd427c6923e021e28794b52b7c24bf2d"
+        }
+      }
+    }
+  ]
+}

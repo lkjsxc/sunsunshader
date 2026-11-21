@@ -3,9 +3,9 @@ name: Check released Horizon compatibility
 on:
   push:
     branches: [main]
-    paths: ["pack/**", "pack-main/**", "tools/**", "compatibility/**", ".github/workflows/check.yml"]
+    paths: ["pack/**", "tools/**", "compatibility/**", ".github/workflows/check.yml"]
   pull_request:
-    paths: ["pack/**", "pack-main/**", "tools/**", "compatibility/**", ".github/workflows/check.yml"]
+    paths: ["pack/**", "tools/**", "compatibility/**", ".github/workflows/check.yml"]
   workflow_dispatch:
 
 permissions:
@@ -22,18 +22,22 @@ jobs:
       - uses: actions/checkout@v4
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
-      - name: Cache pinned validator builds
+      - name: Cache pinned validator and continuity builds
         uses: actions/cache@v4
         with:
           path: |
             ~/.cargo/registry
             ~/.cargo/git
-            .build/horizon-nightly/target
-            .build/horizon-main/target
-          key: sunsun-released-validators-${{ runner.os }}-${{ hashFiles('compatibility/horizon.json') }}
-      - name: Build and check the actual archives
+            .build/horizon-validator
+            .build/post-ir/target
+          key: sunsun-nightly-validator-${{ runner.os }}-${{ hashFiles('compatibility/horizon.json') }}
+      - name: Build and check the archive
         run: python3 tools/release.py check --self-test
-      - name: Keep checked archives and admission evidence
+      - name: Check post continuity and historical refusals
+        run: python3 -m unittest discover -s tools -p 'test_post_continuity.py' -v
+      - name: Check native timing fixtures
+        run: python3 -m unittest discover -s tools -p 'test_gallery_timing.py' -v
+      - name: Keep the checked archive and admission evidence
         uses: actions/upload-artifact@v4
         with:
           name: checked-shader-packs

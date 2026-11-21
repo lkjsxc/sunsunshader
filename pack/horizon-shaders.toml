@@ -1,7 +1,7 @@
 schema = 1
 id = "sunsunshader"
 name = "Sunsun Shader"
-version = "0.2.0-rc6"
+version = "0.2.0-rc7"
 api = "0.2"
 description = "Warm light, cool shade and weathered air."
 authors = ["lkjsxc"]
@@ -148,31 +148,23 @@ output = "ss_bloom"
 
 [[post]]
 file = "shaders/compose.wgsl"
+files = ["shaders/focus.wgsl"]
 reads = ["ss_bloom"]
-name = "Bloom and camera motion"
-
-[[post]]
-file = "shaders/focus.wgsl"
-name = "Optional focus"
-
-[[post]]
-file = "shaders/lens.wgsl"
-name = "Edge resolve"
+name = "Compose, bloom and camera"
 
 [weather]
 file = "shaders/weather.wgsl"
-
-[[post]]
-file = "shaders/tonemap.wgsl"
-name = "Filmic output"
 
 # The existing curve stays the last post, retaining its window-resolution sampling.
 # Display mapping is identity; Horizon performs output encoding exactly once.
 [tonemap]
 file = "shaders/display.wgsl"
+files = ["shaders/lens.wgsl", "shaders/tonemap.wgsl"]
+name = "Edge resolve and filmic output"
 
 [[options]]
 id = "quality"
+resets = "world"
 name = "Profile"
 description = "Low, Medium or High sampling; Medium is the default."
 type = "choice"
@@ -201,6 +193,7 @@ step = 0.1
 
 [[options]]
 id = "local_haze"
+resets = "world"
 name = "Light in the air"
 description = "Opt in to light scattering in damp or enclosed air on Medium and High."
 type = "bool"
@@ -322,7 +315,7 @@ default = false
 [[options]]
 id = "camera_motion_blur"
 name = "Camera motion blur"
-description = "Blur camera movement; object motion is not available."
+description = "Blur camera movement."
 type = "bool"
 default = false
 

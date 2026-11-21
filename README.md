@@ -2,11 +2,11 @@
 
 Sunsun Shader is a native shader pack for Horizon, the Minecraft client written in Rust. It provides dark unlit Overworld spaces, directional shadows, clear blue daylight, layered clouds, reflective water and optional local light haze.
 
-Compatibility: [0.2.0-rc6](https://github.com/lkjsxc/sunsunshader/releases/tag/v0.2.0-rc6) is a release for Horizon Nightly 2026-11-19 · 5ef7734 (shader API 0.2), where older API 0.1 packs no longer load. Medium is the default profile. On Nightly 2026-11-18 · dd67b76, use [0.2.0-rc4](https://github.com/lkjsxc/sunsunshader/releases/tag/v0.2.0-rc4). On Horizon Nightly 2026-11-13 · 9f42064, use [0.2.0-rc2](https://github.com/lkjsxc/sunsunshader/releases/tag/v0.2.0-rc2).
+The **0.2.0-rc7** candidate targets Horizon Nightly 2026-11-19 · 5ef7734 (shader API 0.2). Medium is the default profile. The candidate is staged for local qualification. [Candidate notes](docs/rc7-release.md)
 
 ## Install
 
-Download [sunsunshader-0.2.0-rc6.hshader](https://github.com/lkjsxc/sunsunshader/releases/download/v0.2.0-rc6/sunsunshader-0.2.0-rc6.hshader) (SHA-256: bb098725bb44a4d17a6fb97545ca29f70af877c10943c47f19abf674121e3abe). [Release notes](docs/rc6-release.md)
+The current public release is [sunsunshader-0.2.0-rc6.hshader](https://github.com/lkjsxc/sunsunshader/releases/download/v0.2.0-rc6/sunsunshader-0.2.0-rc6.hshader) (SHA-256: bb098725bb44a4d17a6fb97545ca29f70af877c10943c47f19abf674121e3abe). [Release notes](docs/rc6-release.md)
 
 Put it in the game's shaderpacks/ folder and keep only one Sunsun archive there. Folder installation also works as shaderpacks/sunsunshader/.
 
@@ -48,7 +48,7 @@ foliage transmission, anchored plant wind, eroded cumulus and the separate high
 cloud layer are retained. Nether and End keep their separate dimensional
 atmospheres.
 
-## Profiles and measured cost
+## Profiles
 
 The **Light in the air** option is off by default. Enable it on Medium or High
 for local light scattering. Low retains optical bloom and skips the local
@@ -74,48 +74,15 @@ opaque and transmitting maps sampled separately.
 
 The local-light field accumulates visible observations in kept world buffers.
 Quarter-resolution textures carry separate contributions for receiver lighting
-and emitter halos. The earlier rc2/rc3 measurements below give historical
-context for the look before that change.
-
-<!-- LOOK5_COSTS_BEGIN -->
-| Scene | Profile | rc1 before, ms | rc2, ms | rc1 after, ms | Change vs bracket | rc1 drift |
-| --- | --- | ---: | ---: | ---: | ---: | ---: |
-| Night village | Medium | 217.63 | 177.66 | 180.37 | −20.46 ms / −10.33% | −17.12% |
-| Night village | High | 209.87 | 215.69 | 210.35 | +5.58 ms / +2.65% | +0.23% |
-| Torch/lava cave | Medium | 180.40 | 181.27 | 182.89 | −0.37 ms / −0.20% | +1.38% |
-| Torch/lava cave | High | 147.12 | 155.49 | 169.75 | −2.54 ms / −1.60% | +15.38% |
-
-The bracket reference is `sqrt(rc1_before × rc1_after)`. **Village Medium and
-cave High are strongly affected by baseline drift**; their negative percentages
-do not establish a speedup. Village High's observed increase is small relative
-to overlapping repeat ranges, and cave Medium's difference is unresolved within
-variation. Host variation prevents a precise causal overhead estimate.
-<!-- LOOK5_COSTS_END -->
-
-These are **960×540 Mesa software-renderer elapsed frame times**, using the same
-published client and an eight-worker/CPU limit. Each row uses a separate
-**rc1 → rc2 → rc1** bracket, with three 20-second native raw-frame samples per
-block. Values are the median of the three repeat means. Both baseline sides,
-their drift and repeat ranges are retained in the
-[cost report](https://github.com/lkjsxc/sunsunshader/releases/download/v0.2.0-rc2/costs.md).
-Bracketing reduces slow drift but does not remove shared-host or order effects.
-This is a whole-pack comparison, not isolated haze cost or a hardware GPU claim.
-The manifest's 4 ms at 1920×1080 remains a design target.
+and emitter halos. The folded graph declares nine post entries, including five
+draw passes. With **Light in the air** off, Haze clear and Resolve have
+empty specialized bodies. The manifest sets a 4 ms target at 1920×1080.
 
 Other controls cover exposure, air density, clouds, shadows, terrain reflections,
 wave strength, contact shading, plant wind, weather detail and bloom. Depth of
 field, camera motion blur and vignette are off by default.
 
-## Review evidence and limits
-
-[Release and review files](https://github.com/lkjsxc/sunsunshader/releases/tag/v0.2.0-rc2)
-include the installable archive, SHA-256, ordinary-game gate receipt,
-[native paired sheet](https://github.com/lkjsxc/sunsunshader/releases/download/v0.2.0-rc2/contact.jpg),
-[review](https://github.com/lkjsxc/sunsunshader/releases/download/v0.2.0-rc2/report.md)
-and retained rounds. Each primary cell in the rc2 comparison is a native
-960×540 capture from the pack bytes tested in that round. The rc5 gallery has
-its own capture record. The promotional film is kept separate from this
-release. [rc5 capture settings](docs/gallery-capture.md)
+## Renderer limits
 
 The local air field sees **visible emitting terrain only**. Offscreen and fully
 covered sources, including emitters hidden by glass, are outside that effect.
@@ -155,27 +122,11 @@ python3 tools/release.py check --self-test
 python3 tools/release.py build
 ```
 
-Both commands validate the pinned Nightly and API 0.2 development variants
-through unmodified Horizon validators. `--target nightly` builds the 0.2.0-rc6
-release candidate. The separate `pack-main/` remains the 0.1.1 development visual baseline;
-it is not the public Nightly download.
-
-The ordinary-game admission check adds the restrictions of the pinned Nightly
-renderer to its standalone parser and validator. CI includes negative refusal
-tests and exact packed-file checks. The permanent source tag is
-`nightly-source/2026-11-19-5ef7734`; distribution/source policy identities are
-pinned in [compatibility/horizon.json](compatibility/horizon.json).
-
-After validating and reviewing the final bytes, publish with the checked-in rc6 notes.
-
-```sh
-python3 tools/release.py release dist/sunsunshader-0.2.0-rc6.hshader --notes docs/rc6-release.md --latest
-```
-
-Publication rechecks those bytes, rebuilds for byte identity, and refuses a dirty
-checkout, an unpushed source commit or a mismatching tag. The GitHub Latest release is the candidate for the current public Horizon Nightly.
-See [tools/README.md](tools/README.md) for the gate and pin
-maintenance.
+Both commands check post continuity directly in `pack/` and use Horizon’s
+unmodified validator to check the packed archive for the pinned Nightly.
+The ordinary-game admission check applies the pinned renderer’s additional
+manifest restrictions. The source tag is `nightly-source/2026-11-19-5ef7734`.
+[Horizon pin](compatibility/horizon.json) · [Tools and tests](tools/README.md)
 
 All shader code is original and Apache-2.0 licensed. Published mathematical
 methods are credited in source comments; no other shader pack is used as source.

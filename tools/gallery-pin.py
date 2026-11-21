@@ -1,5 +1,8 @@
 #!/usr/bin/env python3
-"""Create a gallery input pin from a checked Sunsun pack and a signed Horizon Nightly."""
+"""Create a gallery input pin from a checked Sunsun pack and a signed Horizon Nightly.
+
+With --stock, pin the same signed Nightly with no shader pack: the stock timing arm A.
+"""
 import argparse
 import base64
 import binascii
@@ -46,6 +49,11 @@ def check_pack(pack, receipt, horizon):
         "id": metadata["id"], "version": metadata["version"],
         "frame_primaries": metadata.get("frame", {}).get("primaries", "bt709"),
     }
+
+
+def stock_pin(signed):
+    """Timing arm A: the signed client alone. Only this exact shape may carry a null pack."""
+    return {"schema": 1, "arm": "stock", "horizon": signed, "pack": None}
 
 
 def check_signature(version, sums, signatures):
@@ -105,18 +113,24 @@ def check_nightly(horizon, archive, sums_path, signatures_path):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--pack", type=Path, required=True)
-    parser.add_argument("--receipt", type=Path, required=True)
+    parser.add_argument("--pack", type=Path)
+    parser.add_argument("--receipt", type=Path)
+    parser.add_argument("--stock", action="store_true", help="Pin stock Horizon with no shader pack (timing arm A)")
     parser.add_argument("--nightly-archive", type=Path, required=True)
     parser.add_argument("--sums", type=Path, required=True)
     parser.add_argument("--signature", type=Path, required=True, help="SHA256SUMS.v2.sig")
     parser.add_argument("--output", type=Path, required=True)
     args = parser.parse_args()
-    horizon = release.pins()["nightly"]
-    checked = check_pack(args.pack, json.loads(args.receipt.read_text()), horizon)
+    if args.stock and (args.pack or args.receipt):
+        parser.error("--stock pins no shader pack; omit --pack and --receipt")
+    if not args.stock and not (args.pack and args.receipt):
+        parser.error("--pack and --receipt are required unless --stock")
+    horizon = release.nightly_pin()
+    checked = None if args.stock else check_pack(args.pack, json.loads(args.receipt.read_text()), horizon)
     signed = check_nightly(horizon, args.nightly_archive, args.sums, args.signature)
     with args.output.open("x") as output:
-        json.dump({"schema": 1, "pack": checked, "horizon": signed}, output, indent=2)
+        json.dump(stock_pin(signed) if args.stock else {"schema": 1, "pack": checked, "horizon": signed},
+                  output, indent=2)
         output.write("\n")
 
 

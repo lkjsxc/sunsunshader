@@ -2,6 +2,7 @@
 // One owner per receiver macrocell and its eight child emitter cells.
 // Prior B is immutable throughout this pass; A is the only write target.
 fn compute(input: ComputeInput) {
+    if !local_haze || quality == 0u { return; }
     if !input.in_bounds { return; }
     let camera = ss_haze_camera();
     let key = camera.origin + vec3<i32>(input.cell);
