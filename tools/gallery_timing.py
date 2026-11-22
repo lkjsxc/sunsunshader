@@ -101,13 +101,32 @@ def machine_identity():
             "architecture": platform.machine(), "cpu_affinity": sorted(os.sched_getaffinity(0))}
 
 
-def conditions():
+def conditions(sys_root=Path("/sys")):
     """Read-only context, not a thermal correction or an assertion of idle hardware."""
     def files(pattern):
-        return {str(path): path.read_text().strip() for path in sorted(Path("/sys").glob(pattern))
+        return {str(path): path.read_text().strip() for path in sorted(sys_root.glob(pattern))
                 if path.is_file() and os.access(path, os.R_OK)}
+    power_online = {}
+    battery_supplies = []
+    device_power_supplies = []
+    for online in sorted(sys_root.glob("class/power_supply/*/online")):
+        if not online.is_file() or not os.access(online, os.R_OK):
+            continue
+        kind = online.with_name("type")
+        if kind.is_file() and kind.read_text().strip() == "Battery":
+            # Linux exposes the type without querying the driver. Unlike a
+            # supply's online state, battery presence cannot identify mains power.
+            battery_supplies.append(str(online.parent))
+            continue
+        scope = online.with_name("scope")
+        if scope.is_file() and scope.read_text().strip() == "Device":
+            device_power_supplies.append(str(online.parent))
+        else:
+            power_online[str(online)] = online.read_text().strip()
     return {"load_average": list(os.getloadavg()),
-            "power_online": files("class/power_supply/*/online"),
+            "power_online": power_online,
+            "battery_supplies": battery_supplies,
+            "device_power_supplies": device_power_supplies,
             "cpu_governors": files("devices/system/cpu/cpu*/cpufreq/scaling_governor"),
             "temperatures_millidegrees": files("class/thermal/thermal_zone*/temp")}
 

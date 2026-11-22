@@ -1,6 +1,7 @@
 """Small local fixtures only: no client, GPU, browser, account or network."""
 import copy
 from datetime import datetime, timedelta, timezone
+import errno
 import importlib.util
 import json
 import math
@@ -457,6 +458,51 @@ class StockArmTests(unittest.TestCase):
         root.mkdir()
         build_suite(root, stock=True)
         return root
+
+    def test_peripheral_online_changes_do_not_mask_host_power_changes(self):
+        sys_root = Path(self.tmp.name) / "sys"
+        supplies = sys_root / "class/power_supply"
+        for name, kind, scope in (("mouse", "Battery", "Device"), ("mains", "Mains", "System"),
+                                  ("charger", "USB", "Device"), ("unknown", None, None)):
+            path = supplies / name
+            path.mkdir(parents=True)
+            (path / "online").write_text("1\n")
+            if kind is not None:
+                (path / "type").write_text(f"{kind}\n")
+            if scope is not None:
+                (path / "scope").write_text(f"{scope}\n")
+
+        directory = self.root / self.suite["runs"][0]["directory"]
+        scene = self.suite["scenes"][0]
+        inputs = timing.read_json(directory / "inputs.json")
+        record = timing.read_json(directory / f"{scene['id']}.timing.json")
+        mouse = supplies / "mouse/online"
+        read_text = Path.read_text
+
+        def read_supply(path, *args, **kwargs):
+            if path in (mouse, mouse.with_name("scope")):
+                raise OSError(errno.ETIMEDOUT, "HID battery asleep")
+            return read_text(path, *args, **kwargs)
+
+        with patch.object(Path, "read_text", read_supply):
+            before = timing.conditions(sys_root)
+            record["conditions_before"] = before
+            mouse.write_text("0\n")
+            record["conditions_after"] = timing.conditions(sys_root)
+        self.assertEqual(before["power_online"], {str(supplies / name / "online"): "1"
+                                                  for name in ("mains", "unknown")})
+        self.assertEqual(before["battery_supplies"], [str(mouse.parent)])
+        self.assertEqual(record["conditions_after"]["battery_supplies"], [str(mouse.parent)])
+        self.assertEqual(before["device_power_supplies"], [str(supplies / "charger")])
+        timing.validate_record(record, inputs, scene, self.suite["sample"])
+
+        for name in ("mains", "unknown"):
+            online = supplies / name / "online"
+            online.write_text("0\n")
+            record["conditions_after"] = timing.conditions(sys_root)
+            with self.assertRaisesRegex(timing.Invalid, "power_online changed during sample"):
+                timing.validate_record(record, inputs, scene, self.suite["sample"])
+            online.write_text("1\n")
 
     def test_stock_suite_pairs_whole_frame_metrics_and_reports_passes_per_arm(self):
         before = {path: timing.digest(path) for path in self.root.rglob("*") if path.is_file()}
