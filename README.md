@@ -2,17 +2,17 @@
 
 Sunsun Shader is a native shader pack for Horizon, the Minecraft client written in Rust. It provides dark unlit Overworld spaces, directional shadows, clear blue daylight, layered clouds, reflective water and optional local light haze.
 
-The **0.2.0-rc7** candidate targets Horizon Nightly 2026-11-19 · 5ef7734 (shader API 0.2). Medium is the default profile. The candidate is staged for local qualification. [Candidate notes](docs/rc7-release.md)
+**0.2.0-rc7** targets Horizon Nightly 2026-11-19 · 5ef7734 (shader API 0.2). Medium is the default profile. [Release notes](docs/rc7-release.md)
 
 ## Install
 
-The current public release is [sunsunshader-0.2.0-rc6.hshader](https://github.com/lkjsxc/sunsunshader/releases/download/v0.2.0-rc6/sunsunshader-0.2.0-rc6.hshader) (SHA-256: bb098725bb44a4d17a6fb97545ca29f70af877c10943c47f19abf674121e3abe). [Release notes](docs/rc6-release.md)
+Download [sunsunshader-0.2.0-rc7.hshader](https://github.com/lkjsxc/sunsunshader/releases/download/v0.2.0-rc7/sunsunshader-0.2.0-rc7.hshader) (SHA-256: e9ad02f6c8f827e72fa8317a08d2cba93dda63db91763c8935d99ffe8ac475fe).
 
 Put it in the game's shaderpacks/ folder and keep only one Sunsun archive there. Folder installation also works as shaderpacks/sunsunshader/.
 
 Select Sunsun Shader under Options → Video Settings → Shaders → Shader Packs.
 
-No experimental settings are needed. rc6 fixes detached trial-spawner halos when local haze is enabled and darkens the iron frames of ordinary and soul lanterns.
+No experimental settings are needed. rc7 folds the post graph to nine entries and removes single-pixel edge and focus flecks.
 
 ## Screenshot gallery
 
@@ -77,6 +77,8 @@ Quarter-resolution textures carry separate contributions for receiver lighting
 and emitter halos. The folded graph declares nine post entries, including five
 draw passes. With **Light in the air** off, Haze clear and Resolve have
 empty specialized bodies. The manifest sets a 4 ms target at 1920×1080.
+On a Radeon 780M, the folded build measured 13.3–16.1 ms of GPU span on
+Medium and 8.9–11.6 ms on Low. See the [release notes](docs/rc7-release.md).
 
 Other controls cover exposure, air density, clouds, shadows, terrain reflections,
 wave strength, contact shading, plant wind, weather detail and bloom. Depth of

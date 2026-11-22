@@ -1,23 +1,26 @@
-# Sunsun Shader 0.2.0-rc7 candidate
+# Sunsun Shader 0.2.0-rc7
 
-The folded pack targets Horizon Nightly 2026-11-19 (5ef7734) and shader API 0.2.
-Medium is the default profile. Light in the air, depth of field, camera motion
-blur and vignette are off by default.
+Sunsun rc7 is for Horizon Nightly 2026-11-19 (5ef7734) with shader API 0.2. Place the archive in the game's `shaderpacks/` folder and select Sunsun Shader. Medium is the default profile. **Light in the air**, depth of field, camera motion blur and vignette are off by default.
 
-- Compose combines bloom, camera blur and optional focus. Display applies edge
-  resolve and filmic output. The manifest goes from 12 to 9 post entries and
-  from 8 to 5 draw passes. Haze clear and Resolve specialize to empty bodies
-  with Light in the air off.
-- The rc6c edge and focus changes removed single-pixel flecks in the checked
-  scenes. The earlier Fc-on-rc6c comparison across seven llvmpipe conditions at
-  1920×1080 recorded mean differences of at most 0.0168 codes and peaks of 1–3
-  codes. Archive member comparison and static inspection carry that evidence
-  to this candidate's default motion-off path.
-- With camera blur enabled, static checks show a continuous fade at the
-  previous-view horizon within the finite stock camera envelope on devices
-  with a maximum 2D texture dimension of at most 32768. The projection bound
-  fits f32 even when the previous and current frames differ in size.
+- The post-processing graph is folded from 12 post entries to 9, and from 8 draw passes to 5. Compose combines bloom, camera blur and optional focus. Display applies edge resolve and filmic output. With Light in the air off, Haze clear and Resolve do no work.
+- Edge resolve and focus remove single-pixel flecks that rc6 left in the checked scenes.
+- Static checks cover camera motion blur’s fade at the edge of the previous view.
 
-The pinned Horizon validator and ordinary-game admission pass on CPU. The
-4 ms Medium budget at 1920×1080 remains a target. First RADV execution and
-stock-relative timing still depend on the staged G2 run. The gallery shows rc5.
+The folded graph was compared with the unfolded graph carrying the same fixes in seven software-rendered scenes at 1920×1080. Mean differences were at most 0.017 codes, and peaks were 1–3 codes out of 255.
+
+## Measured cost
+
+These measurements used a Radeon 780M (RADV, Mesa 26.3.1), Horizon 5ef7734, 1920×1080 offscreen SDR and two frozen scenes. The arm figures are medians of the per-run p50 GPU spans across six runs. Added cost is the median paired difference. Runs alternated with Horizon without a shader pack.
+
+| Profile | Scene | No pack | Sunsun | Added |
+| --- | --- | ---: | ---: | ---: |
+| Medium | Night lantern | 0.72 ms | 13.29 ms | +12.57 ms |
+| Medium | Rain | 1.18 ms | 16.10 ms | +14.92 ms |
+| Low | Night lantern | 0.72 ms | 8.87 ms | +8.15 ms |
+| Low | Rain | 1.18 ms | 11.58 ms | +10.41 ms |
+
+On Medium in the same setup, turning **Clouds** off saved 4.7 ms in the night-lantern scene and 5.9 ms in rain. The manifest targets 4 ms at 1920×1080. The timed archive is the folded build that rc7 was promoted from. With camera motion blur off, rc7's default path is statically identical to it. Pass instrumentation was on in both arms and adds more timer work with the pack active. The figures describe offscreen GPU spans.
+
+The release archive passed the pinned Nightly validator, ordinary-game admission, negative admission and post-continuity checks. The exact archive also rendered on the same Radeon.
+
+Archive SHA-256 `e9ad02f6c8f827e72fa8317a08d2cba93dda63db91763c8935d99ffe8ac475fe`.
